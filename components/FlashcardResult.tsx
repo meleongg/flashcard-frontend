@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,12 +70,12 @@ export const FlashcardResult: React.FC<FlashcardData> = ({
 
   const copyToClipboard = () => {
     const content = `
-Word: ${word}
-Translation: ${translation}
-Pronunciation: ${phonetic}
-Part of Speech: ${posDescriptions[pos] || pos}
-Example: ${example}
-Notes: ${notes}
+      Word: ${word}
+      Translation: ${translation}
+      Pronunciation: ${phonetic}
+      Part of Speech: ${posDescriptions[pos] || pos}
+      Example: ${example}
+      Notes: ${notes}
     `.trim();
     navigator.clipboard.writeText(content);
     toast.success("Copied flashcard content to clipboard");
