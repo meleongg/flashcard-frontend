@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { BookOpen, Lightbulb, Loader, Search } from "lucide-react";
 import { Session } from "next-auth";
-import { signIn } from "next-auth/react";
 import { KeyboardEvent, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
 
@@ -36,12 +35,6 @@ export function DashboardClient({ session }: { session: Session }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async () => {
-    if (!session) {
-      toast.error("You must be signed in to generate flashcards");
-      signIn();
-      return;
-    }
-
     if (!text.trim()) {
       toast.error("Please enter a word or phrase");
       return;
@@ -54,7 +47,10 @@ export function DashboardClient({ session }: { session: Session }) {
       const res = await fetch(`${apiUrl}/flashcard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word: text }),
+        body: JSON.stringify({
+          word: text,
+          userId: session?.user?.id,
+        }),
       });
 
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);

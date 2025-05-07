@@ -13,7 +13,6 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  // store session as JWT instead of the database
   session: { strategy: "database" },
   pages: {
     signIn: "/login",
