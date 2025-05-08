@@ -13,8 +13,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { BookOpen, Lightbulb, Loader, Search } from "lucide-react";
 import { Session } from "next-auth";
-import { KeyboardEvent, useRef, useState } from "react";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
+import { FlashcardResponse } from "@/types/flashcard";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -30,9 +31,28 @@ export function DashboardClient({ session }: { session: Session }) {
     example: string;
     notes: string;
   }>(null);
+  const [allFlashcards, setAllFlashcards] = useState<FlashcardResponse[]>([]);
 
   const resultRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const fetchFlashcards = async () => {
+    if (!session?.user?.id) return;
+    try {
+      const res = await fetch(
+        `${apiUrl}/flashcards?user_id=${session.user.id}`
+      );
+      if (!res.ok) throw new Error("Failed to fetch flashcards");
+      const data = await res.json();
+      setAllFlashcards(data);
+    } catch (err) {
+      console.error("Error fetching flashcards:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchFlashcards();
+  }, [session]);
 
   const handleSubmit = async () => {
     if (!text.trim()) {
@@ -56,6 +76,8 @@ export function DashboardClient({ session }: { session: Session }) {
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);
       const data = await res.json();
       setResult(data);
+
+      await fetchFlashcards();
       toast.success("Flashcard generated successfully");
     } catch (err: any) {
       setError("Something went wrong. Please try again.");
@@ -168,6 +190,23 @@ export function DashboardClient({ session }: { session: Session }) {
           />
         )}
       </div>
+
+      {allFlashcards.length > 0 && (
+        <div className="space-y-4 mt-8">
+          <h2 className="text-xl font-semibold">Your Saved Flashcards</h2>
+          {allFlashcards.map((fc) => (
+            <FlashcardResult
+              key={fc.id}
+              word={fc.word}
+              translation={fc.translation}
+              phonetic={fc.phonetic}
+              pos={fc.pos}
+              example={fc.example}
+              notes={fc.notes}
+            />
+          ))}
+        </div>
+      )}
 
       <Toaster position="bottom-right" />
     </main>

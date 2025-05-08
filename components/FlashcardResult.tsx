@@ -16,18 +16,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FlashcardData } from "@/types/flashcard";
 import { Bookmark, CheckCircle, Copy, Share, Volume2 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
-
-interface FlashcardData {
-  word: string;
-  translation: string;
-  phonetic: string;
-  pos: string;
-  example: string;
-  notes: string;
-}
 
 // Map of POS tags to more readable descriptions
 const posDescriptions: Record<string, string> = {
