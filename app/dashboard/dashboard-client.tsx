@@ -23,6 +23,7 @@ import {
 import { Session } from "next-auth";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -45,6 +46,8 @@ export function DashboardClient({ session }: { session: Session }) {
   const [totalFlashcards, setTotalFlashcards] = useState(0);
   const resultRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const MAX_WORD_LENGTH = 50;
 
   const fetchFlashcards = async (currentPage = 0) => {
     if (!session?.user?.id) return;
@@ -73,13 +76,25 @@ export function DashboardClient({ session }: { session: Session }) {
   }, [session, page]);
 
   const handleSubmit = async () => {
+    // Reset error states
+    setInputError(null);
+    setError(null);
+
+    // Validation
     if (!text.trim()) {
+      setInputError("Please enter a word or phrase");
       toast.error("Please enter a word or phrase");
       return;
     }
 
+    if (text.length > MAX_WORD_LENGTH) {
+      setInputError(`Input must be ${MAX_WORD_LENGTH} characters or less`);
+      toast.error(`Input too long (maximum ${MAX_WORD_LENGTH} characters)`);
+      return;
+    }
+
+    // Input is valid, proceed with API call
     setIsLoading(true);
-    setError(null);
 
     try {
       const res = await fetch(`${apiUrl}/flashcard`, {
@@ -190,11 +205,18 @@ export function DashboardClient({ session }: { session: Session }) {
                 id="word-input"
                 ref={inputRef}
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (inputError) setInputError(null);
+                }}
                 onKeyDown={handleKeyPress}
                 placeholder="Enter a word or phrase (e.g., hello, good morning)"
-                className="flex-1"
+                className={cn(
+                  "flex-1",
+                  inputError && "border-red-500 focus-visible:ring-red-500"
+                )}
                 disabled={isLoading}
+                maxLength={MAX_WORD_LENGTH}
               />
               <Button
                 onClick={handleSubmit}
@@ -209,9 +231,13 @@ export function DashboardClient({ session }: { session: Session }) {
                 {isLoading ? "Generating..." : "Analyze"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Press Enter to submit or click the Analyze button
-            </p>
+            {inputError ? (
+              <p className="text-xs text-red-500">{inputError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Press Enter to submit or click the Analyze button
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

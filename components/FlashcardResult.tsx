@@ -46,6 +46,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { FlashcardData } from "@/types/flashcard";
 import {
   Bookmark,
@@ -59,6 +60,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod"; // You'll need to install zod: npm install zod
 
 // Map of POS tags to more readable descriptions
 const posDescriptions: Record<string, string> = {
@@ -89,12 +91,29 @@ const posColors: Record<string, string> = {
   PROPN: "bg-indigo-100 text-indigo-800",
 };
 
-// Extended props type
 interface FlashcardResultProps extends FlashcardData {
   id?: string;
   onDelete?: (id: string) => Promise<void>;
   onEdit?: (id: string, data: Partial<FlashcardData>) => Promise<void>;
 }
+
+// Create a validation schema using zod
+const flashcardSchema = z.object({
+  word: z
+    .string()
+    .min(1, "Word is required")
+    .max(50, "Word is too long (max 50 characters)"),
+  translation: z
+    .string()
+    .min(1, "Translation is required")
+    .max(100, "Translation is too long"),
+  phonetic: z.string().max(50, "Phonetic text is too long"),
+  pos: z.string().min(1, "Part of speech is required"),
+  example: z.string().max(500, "Example is too long"),
+  notes: z.string().max(500, "Notes are too long"),
+});
+
+type FlashcardField = keyof z.infer<typeof flashcardSchema>;
 
 export const FlashcardResult: React.FC<FlashcardResultProps> = ({
   id,
@@ -121,6 +140,10 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
     notes,
   });
 
+  const [formErrors, setFormErrors] = useState<
+    Record<string, string | undefined>
+  >({});
+
   const copyToClipboard = () => {
     const content = `
       Word: ${word}
@@ -132,6 +155,39 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
     `.trim();
     navigator.clipboard.writeText(content);
     toast.success("Copied flashcard content to clipboard");
+  };
+
+  const validateField = (name: FlashcardField, value: string) => {
+    try {
+      flashcardSchema.shape[name].parse(value);
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+      return true;
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const message = error.errors[0]?.message || `Invalid ${name}`;
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: message,
+        }));
+        return false;
+      }
+      return true;
+    }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    // Type assertion to tell TypeScript that name is a valid field
+    validateField(name as FlashcardField, value);
   };
 
   const handleSave = () => {
@@ -162,25 +218,33 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
     }
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setEditForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
   const handleSelectChange = (value: string) => {
     setEditForm((prev) => ({
       ...prev,
       pos: value,
     }));
+    validateField("pos", value);
   };
 
   const handleEditSubmit = async () => {
     if (!id || !onEdit) return;
+
+    // Validate all fields
+    try {
+      flashcardSchema.parse(editForm);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
+        toast.error("Please fix the errors in the form");
+        return;
+      }
+    }
 
     setIsEditing(true);
     try {
@@ -333,39 +397,90 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                 </DialogHeader>
                 <div className="grid gap-3 py-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="word">Word</Label>
+                    <Label htmlFor="word">
+                      Word{" "}
+                      {formErrors.word && (
+                        <span className="text-xs text-red-500">*</span>
+                      )}
+                    </Label>
                     <Input
                       id="word"
                       name="word"
                       value={editForm.word}
                       onChange={handleInputChange}
+                      className={cn(
+                        formErrors.word &&
+                          "border-red-500 focus-visible:ring-red-500"
+                      )}
                     />
+                    {formErrors.word && (
+                      <p className="text-xs text-red-500">{formErrors.word}</p>
+                    )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="translation">Translation</Label>
+                    <Label htmlFor="translation">
+                      Translation{" "}
+                      {formErrors.translation && (
+                        <span className="text-xs text-red-500">*</span>
+                      )}
+                    </Label>
                     <Input
                       id="translation"
                       name="translation"
                       value={editForm.translation}
                       onChange={handleInputChange}
+                      className={cn(
+                        formErrors.translation &&
+                          "border-red-500 focus-visible:ring-red-500"
+                      )}
                     />
+                    {formErrors.translation && (
+                      <p className="text-xs text-red-500">
+                        {formErrors.translation}
+                      </p>
+                    )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="phonetic">Phonetic</Label>
+                    <Label htmlFor="phonetic">
+                      Phonetic{" "}
+                      {formErrors.phonetic && (
+                        <span className="text-xs text-red-500">*</span>
+                      )}
+                    </Label>
                     <Input
                       id="phonetic"
                       name="phonetic"
                       value={editForm.phonetic}
                       onChange={handleInputChange}
+                      className={cn(
+                        formErrors.phonetic &&
+                          "border-red-500 focus-visible:ring-red-500"
+                      )}
                     />
+                    {formErrors.phonetic && (
+                      <p className="text-xs text-red-500">
+                        {formErrors.phonetic}
+                      </p>
+                    )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="pos">Part of Speech</Label>
+                    <Label htmlFor="pos">
+                      Part of Speech{" "}
+                      {formErrors.pos && (
+                        <span className="text-xs text-red-500">*</span>
+                      )}
+                    </Label>
                     <Select
                       value={editForm.pos}
                       onValueChange={handleSelectChange}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        className={cn(
+                          "w-full",
+                          formErrors.pos &&
+                            "border-red-500 focus-visible:ring-red-500"
+                        )}
+                      >
                         <SelectValue placeholder="Select part of speech" />
                       </SelectTrigger>
                       <SelectContent>
@@ -376,26 +491,55 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                         ))}
                       </SelectContent>
                     </Select>
+                    {formErrors.pos && (
+                      <p className="text-xs text-red-500">{formErrors.pos}</p>
+                    )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="example">Example</Label>
+                    <Label htmlFor="example">
+                      Example{" "}
+                      {formErrors.example && (
+                        <span className="text-xs text-red-500">*</span>
+                      )}
+                    </Label>
                     <Textarea
                       id="example"
                       name="example"
                       value={editForm.example}
                       onChange={handleInputChange}
                       rows={3}
+                      className={cn(
+                        formErrors.example &&
+                          "border-red-500 focus-visible:ring-red-500"
+                      )}
                     />
+                    {formErrors.example && (
+                      <p className="text-xs text-red-500">
+                        {formErrors.example}
+                      </p>
+                    )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="notes">Notes</Label>
+                    <Label htmlFor="notes">
+                      Notes{" "}
+                      {formErrors.notes && (
+                        <span className="text-xs text-red-500">*</span>
+                      )}
+                    </Label>
                     <Textarea
                       id="notes"
                       name="notes"
                       value={editForm.notes}
                       onChange={handleInputChange}
                       rows={3}
+                      className={cn(
+                        formErrors.notes &&
+                          "border-red-500 focus-visible:ring-red-500"
+                      )}
                     />
+                    {formErrors.notes && (
+                      <p className="text-xs text-red-500">{formErrors.notes}</p>
+                    )}
                   </div>
                 </div>
                 <DialogFooter className="pt-2">
