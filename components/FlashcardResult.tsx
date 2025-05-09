@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -40,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -196,16 +196,18 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
 
   return (
     <Card className="overflow-hidden border-2 border-primary/10">
-      <CardHeader className="bg-primary/5">
+      <CardHeader className="bg-primary/5 px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl">Language Flashcard</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">
+            Language Flashcard
+          </CardTitle>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge
                   className={`${
                     posColors[pos] || "bg-gray-100 text-gray-800"
-                  } cursor-pointer`}
+                  } cursor-pointer text-xs sm:text-sm`}
                 >
                   {posDescriptions[pos] || pos}
                 </Badge>
@@ -218,23 +220,29 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6 pb-2">
+      <CardContent className="pt-4 pb-2 px-4 sm:pt-6 sm:px-6">
         <Tabs defaultValue="study" className="w-full">
-          <TabsList className="grid grid-cols-2 mb-4">
-            <TabsTrigger value="study" className="cursor-pointer">
+          <TabsList className="grid grid-cols-2 mb-4 w-full">
+            <TabsTrigger
+              value="study"
+              className="cursor-pointer text-xs sm:text-sm"
+            >
               Study
             </TabsTrigger>
-            <TabsTrigger value="details" className="cursor-pointer">
+            <TabsTrigger
+              value="details"
+              className="cursor-pointer text-xs sm:text-sm"
+            >
               Details
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="study" className="space-y-4">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 pb-2 border-b">
+          <TabsContent value="study" className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col gap-2 pb-2 border-b">
               <div>
-                <h2 className="text-3xl font-bold">{word}</h2>
+                <h2 className="text-xl sm:text-3xl font-bold">{word}</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-lg text-muted-foreground">
+                  <span className="text-base sm:text-lg text-muted-foreground">
                     {translation}
                   </span>
                   <Button
@@ -246,7 +254,7 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                     <Volume2 className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="text-sm italic text-muted-foreground">
+                <div className="text-xs sm:text-sm italic text-muted-foreground">
                   {phonetic}
                 </div>
               </div>
@@ -256,7 +264,9 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
               <h3 className="text-sm font-medium text-muted-foreground mb-1">
                 Example
               </h3>
-              <p className="text-lg p-3 bg-muted rounded-md">{example}</p>
+              <p className="text-base sm:text-lg p-2 sm:p-3 bg-muted rounded-md">
+                {example}
+              </p>
             </div>
           </TabsContent>
 
@@ -283,23 +293,23 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
         </Tabs>
       </CardContent>
 
-      <CardFooter className="flex justify-between pt-2 pb-4">
-        <div className="flex gap-2">
+      <CardFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 justify-between pt-2 pb-3 px-4 sm:px-6 sm:pb-4">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start">
           <Button
             size="sm"
             variant="outline"
             onClick={copyToClipboard}
-            className="cursor-pointer"
+            className="cursor-pointer text-xs"
           >
-            <Copy className="h-4 w-4 mr-1" /> Copy
+            <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Copy
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleShare}
-            className="cursor-pointer"
+            className="cursor-pointer text-xs"
           >
-            <Share className="h-4 w-4 mr-1" /> Share
+            <Share className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Share
           </Button>
 
           {/* Edit Button and Dialog */}
@@ -309,19 +319,19 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="cursor-pointer text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                  className="cursor-pointer text-blue-500 hover:text-blue-700 hover:bg-blue-50 text-xs"
                 >
-                  <Edit className="h-4 w-4 mr-1" /> Edit
+                  <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Edit
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
+              <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                <DialogHeader className="pb-2">
                   <DialogTitle>Edit flashcard</DialogTitle>
                   <DialogDescription>
                     Make changes to your flashcard below.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-3 py-2">
                   <div className="grid gap-2">
                     <Label htmlFor="word">Word</Label>
                     <Input
@@ -388,11 +398,12 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                     />
                   </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="pt-2">
                   <Button
                     type="submit"
                     onClick={handleEditSubmit}
                     disabled={isEditing}
+                    className="w-full sm:w-auto"
                   >
                     {isEditing ? (
                       <>
@@ -408,19 +419,19 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
             </Dialog>
           )}
 
-          {/* Existing Delete Button and Dialog */}
+          {/* Delete Button */}
           {id && onDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-50"
+                  className="cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
                 >
-                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Delete
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="max-w-[90vw] sm:max-w-md p-4 sm:p-6">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete flashcard</AlertDialogTitle>
                   <AlertDialogDescription>
@@ -458,12 +469,12 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
           variant={saved ? "default" : "secondary"}
           onClick={handleSave}
           disabled={saved}
-          className="cursor-pointer"
+          className="cursor-pointer text-xs w-full sm:w-auto mt-2 sm:mt-0"
         >
           {saved ? (
-            <CheckCircle className="h-4 w-4 mr-1" />
+            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
           ) : (
-            <Bookmark className="h-4 w-4 mr-1" />
+            <Bookmark className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
           )}
           {saved ? "Saved" : "Save"}
         </Button>
