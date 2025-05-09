@@ -58,7 +58,7 @@ export function DashboardClient({ session }: { session: Session }) {
       );
       if (!res.ok) throw new Error("Failed to fetch flashcards");
       const data = await res.json();
-      setAllFlashcards(data);
+      setAllFlashcards(data.flashcards);
       setTotalFlashcards(data.total);
     } catch (err) {
       console.error("Error fetching flashcards:", err);
@@ -109,6 +109,26 @@ export function DashboardClient({ session }: { session: Session }) {
 
   const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !isLoading) handleSubmit();
+  };
+
+  const deleteFlashcard = async (flashcardId: string) => {
+    try {
+      const res = await fetch(`${apiUrl}/flashcard/${flashcardId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
+      }
+
+      // Refresh the flashcards list
+      await fetchFlashcards(page);
+      toast.success("Flashcard deleted successfully");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete flashcard");
+      throw error;
+    }
   };
 
   return (
@@ -230,12 +250,14 @@ export function DashboardClient({ session }: { session: Session }) {
               {allFlashcards.map((fc) => (
                 <FlashcardResult
                   key={fc.id}
+                  id={fc.id}
                   word={fc.word}
                   translation={fc.translation}
                   phonetic={fc.phonetic}
                   pos={fc.pos}
                   example={fc.example}
                   notes={fc.notes}
+                  onDelete={deleteFlashcard}
                 />
               ))}
 

@@ -16,6 +16,7 @@ export type FlashcardResponse = {
 };
 
 export interface FlashcardData {
+  id?: string;
   word: string;
   translation: string;
   phonetic: string;

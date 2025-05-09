@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +28,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FlashcardData } from "@/types/flashcard";
-import { Bookmark, CheckCircle, Copy, Share, Volume2 } from "lucide-react";
+import {
+  Bookmark,
+  CheckCircle,
+  Copy,
+  Loader,
+  Share,
+  Trash2,
+  Volume2,
+} from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
 
@@ -50,15 +69,24 @@ const posColors: Record<string, string> = {
   PROPN: "bg-indigo-100 text-indigo-800",
 };
 
-export const FlashcardResult: React.FC<FlashcardData> = ({
+// Extended props type
+interface FlashcardResultProps extends FlashcardData {
+  id?: string;
+  onDelete?: (id: string) => Promise<void>;
+}
+
+export const FlashcardResult: React.FC<FlashcardResultProps> = ({
+  id,
   word,
   translation,
   phonetic,
   pos,
   example,
   notes,
+  onDelete,
 }) => {
   const [saved, setSaved] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const copyToClipboard = () => {
     const content = `
@@ -76,17 +104,29 @@ export const FlashcardResult: React.FC<FlashcardData> = ({
   const handleSave = () => {
     setSaved(true);
     toast.success("Flashcard saved to your collection");
-    // Implementation would connect to a storage mechanism
   };
 
   const handleShare = () => {
-    // Implementation would open a share dialog
     toast.success("Share dialog opened");
   };
 
   const playPronunciation = () => {
-    // Implementation would use text-to-speech API
     toast.info("Playing pronunciation...");
+  };
+
+  const handleDelete = async () => {
+    if (!id || !onDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(id);
+      // Toast is handled in parent component
+    } catch (err) {
+      // If there's an error that wasn't caught by parent
+      console.error("Delete error:", err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -98,7 +138,9 @@ export const FlashcardResult: React.FC<FlashcardData> = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge
-                  className={`${posColors[pos] || "bg-gray-100 text-gray-800"}`}
+                  className={`${
+                    posColors[pos] || "bg-gray-100 text-gray-800"
+                  } cursor-pointer`}
                 >
                   {posDescriptions[pos] || pos}
                 </Badge>
@@ -114,8 +156,12 @@ export const FlashcardResult: React.FC<FlashcardData> = ({
       <CardContent className="pt-6 pb-2">
         <Tabs defaultValue="study" className="w-full">
           <TabsList className="grid grid-cols-2 mb-4">
-            <TabsTrigger value="study">Study</TabsTrigger>
-            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="study" className="cursor-pointer">
+              Study
+            </TabsTrigger>
+            <TabsTrigger value="details" className="cursor-pointer">
+              Details
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="study" className="space-y-4">
@@ -130,7 +176,7 @@ export const FlashcardResult: React.FC<FlashcardData> = ({
                     size="icon"
                     variant="ghost"
                     onClick={playPronunciation}
-                    className="h-6 w-6 rounded-full"
+                    className="h-6 w-6 rounded-full cursor-pointer"
                   >
                     <Volume2 className="h-4 w-4" />
                   </Button>
@@ -174,18 +220,72 @@ export const FlashcardResult: React.FC<FlashcardData> = ({
 
       <CardFooter className="flex justify-between pt-2 pb-4">
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={copyToClipboard}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={copyToClipboard}
+            className="cursor-pointer"
+          >
             <Copy className="h-4 w-4 mr-1" /> Copy
           </Button>
-          <Button size="sm" variant="outline" onClick={handleShare}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleShare}
+            className="cursor-pointer"
+          >
             <Share className="h-4 w-4 mr-1" /> Share
           </Button>
+          {id && onDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete flashcard</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete the flashcard for{" "}
+                    <span className="font-semibold">"{word}"</span>? This action
+                    cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="cursor-pointer">
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="bg-red-500 hover:bg-red-600 focus:ring-red-500 cursor-pointer"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin mr-1" />
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
+
         <Button
           size="sm"
           variant={saved ? "default" : "secondary"}
           onClick={handleSave}
           disabled={saved}
+          className="cursor-pointer"
         >
           {saved ? (
             <CheckCircle className="h-4 w-4 mr-1" />
