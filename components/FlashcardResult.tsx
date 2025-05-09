@@ -388,161 +388,174 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                   <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Edit
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-                <DialogHeader className="pb-2">
+              <DialogContent className="sm:max-w-md max-h-[80vh] overflow-hidden flex flex-col p-0">
+                {/* Dialog header now sticky at top */}
+                <DialogHeader className="sticky top-0 z-10 bg-background px-4 pt-4 pb-2">
                   <DialogTitle>Edit flashcard</DialogTitle>
                   <DialogDescription>
                     Make changes to your flashcard below.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-3 py-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="word">
-                      Word{" "}
-                      {formErrors.word && (
-                        <span className="text-xs text-red-500">*</span>
-                      )}
-                    </Label>
-                    <Input
-                      id="word"
-                      name="word"
-                      value={editForm.word}
-                      onChange={handleInputChange}
-                      className={cn(
-                        formErrors.word &&
-                          "border-red-500 focus-visible:ring-red-500"
-                      )}
-                    />
-                    {formErrors.word && (
-                      <p className="text-xs text-red-500">{formErrors.word}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="translation">
-                      Translation{" "}
-                      {formErrors.translation && (
-                        <span className="text-xs text-red-500">*</span>
-                      )}
-                    </Label>
-                    <Input
-                      id="translation"
-                      name="translation"
-                      value={editForm.translation}
-                      onChange={handleInputChange}
-                      className={cn(
-                        formErrors.translation &&
-                          "border-red-500 focus-visible:ring-red-500"
-                      )}
-                    />
-                    {formErrors.translation && (
-                      <p className="text-xs text-red-500">
-                        {formErrors.translation}
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="phonetic">
-                      Phonetic{" "}
-                      {formErrors.phonetic && (
-                        <span className="text-xs text-red-500">*</span>
-                      )}
-                    </Label>
-                    <Input
-                      id="phonetic"
-                      name="phonetic"
-                      value={editForm.phonetic}
-                      onChange={handleInputChange}
-                      className={cn(
-                        formErrors.phonetic &&
-                          "border-red-500 focus-visible:ring-red-500"
-                      )}
-                    />
-                    {formErrors.phonetic && (
-                      <p className="text-xs text-red-500">
-                        {formErrors.phonetic}
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="pos">
-                      Part of Speech{" "}
-                      {formErrors.pos && (
-                        <span className="text-xs text-red-500">*</span>
-                      )}
-                    </Label>
-                    <Select
-                      value={editForm.pos}
-                      onValueChange={handleSelectChange}
-                    >
-                      <SelectTrigger
+
+                {/* Scrollable content area */}
+                <div className="flex-1 overflow-y-auto px-4 py-2">
+                  <div className="grid gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="word">
+                        Word{" "}
+                        {formErrors.word && (
+                          <span className="text-xs text-red-500">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="word"
+                        name="word"
+                        value={editForm.word}
+                        onChange={handleInputChange}
                         className={cn(
-                          "w-full",
-                          formErrors.pos &&
+                          formErrors.word &&
                             "border-red-500 focus-visible:ring-red-500"
                         )}
+                      />
+                      {formErrors.word && (
+                        <p className="text-xs text-red-500">
+                          {formErrors.word}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="translation">
+                        Translation{" "}
+                        {formErrors.translation && (
+                          <span className="text-xs text-red-500">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="translation"
+                        name="translation"
+                        value={editForm.translation}
+                        onChange={handleInputChange}
+                        className={cn(
+                          formErrors.translation &&
+                            "border-red-500 focus-visible:ring-red-500"
+                        )}
+                      />
+                      {formErrors.translation && (
+                        <p className="text-xs text-red-500">
+                          {formErrors.translation}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="phonetic">
+                        Phonetic{" "}
+                        {formErrors.phonetic && (
+                          <span className="text-xs text-red-500">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="phonetic"
+                        name="phonetic"
+                        value={editForm.phonetic}
+                        onChange={handleInputChange}
+                        className={cn(
+                          formErrors.phonetic &&
+                            "border-red-500 focus-visible:ring-red-500"
+                        )}
+                      />
+                      {formErrors.phonetic && (
+                        <p className="text-xs text-red-500">
+                          {formErrors.phonetic}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pos">
+                        Part of Speech{" "}
+                        {formErrors.pos && (
+                          <span className="text-xs text-red-500">*</span>
+                        )}
+                      </Label>
+                      <Select
+                        value={editForm.pos}
+                        onValueChange={handleSelectChange}
                       >
-                        <SelectValue placeholder="Select part of speech" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(posDescriptions).map(([key, value]) => (
-                          <SelectItem key={key} value={key}>
-                            {value}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.pos && (
-                      <p className="text-xs text-red-500">{formErrors.pos}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="example">
-                      Example{" "}
+                        <SelectTrigger
+                          className={cn(
+                            "w-full",
+                            formErrors.pos &&
+                              "border-red-500 focus-visible:ring-red-500"
+                          )}
+                        >
+                          <SelectValue placeholder="Select part of speech" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(posDescriptions).map(
+                            ([key, value]) => (
+                              <SelectItem key={key} value={key}>
+                                {value}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {formErrors.pos && (
+                        <p className="text-xs text-red-500">{formErrors.pos}</p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="example">
+                        Example{" "}
+                        {formErrors.example && (
+                          <span className="text-xs text-red-500">*</span>
+                        )}
+                      </Label>
+                      <Textarea
+                        id="example"
+                        name="example"
+                        value={editForm.example}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className={cn(
+                          formErrors.example &&
+                            "border-red-500 focus-visible:ring-red-500"
+                        )}
+                      />
                       {formErrors.example && (
-                        <span className="text-xs text-red-500">*</span>
+                        <p className="text-xs text-red-500">
+                          {formErrors.example}
+                        </p>
                       )}
-                    </Label>
-                    <Textarea
-                      id="example"
-                      name="example"
-                      value={editForm.example}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className={cn(
-                        formErrors.example &&
-                          "border-red-500 focus-visible:ring-red-500"
-                      )}
-                    />
-                    {formErrors.example && (
-                      <p className="text-xs text-red-500">
-                        {formErrors.example}
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="notes">
-                      Notes{" "}
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="notes">
+                        Notes{" "}
+                        {formErrors.notes && (
+                          <span className="text-xs text-red-500">*</span>
+                        )}
+                      </Label>
+                      <Textarea
+                        id="notes"
+                        name="notes"
+                        value={editForm.notes}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className={cn(
+                          formErrors.notes &&
+                            "border-red-500 focus-visible:ring-red-500"
+                        )}
+                      />
                       {formErrors.notes && (
-                        <span className="text-xs text-red-500">*</span>
+                        <p className="text-xs text-red-500">
+                          {formErrors.notes}
+                        </p>
                       )}
-                    </Label>
-                    <Textarea
-                      id="notes"
-                      name="notes"
-                      value={editForm.notes}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className={cn(
-                        formErrors.notes &&
-                          "border-red-500 focus-visible:ring-red-500"
-                      )}
-                    />
-                    {formErrors.notes && (
-                      <p className="text-xs text-red-500">{formErrors.notes}</p>
-                    )}
+                    </div>
                   </div>
                 </div>
-                <DialogFooter className="pt-2">
+
+                {/* Sticky footer at bottom */}
+                <DialogFooter className="sticky bottom-0 z-10 bg-background px-4 py-3 border-t">
                   <Button
                     type="submit"
                     onClick={handleEditSubmit}
@@ -575,8 +588,8 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                   <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Delete
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="max-w-[90vw] sm:max-w-md p-4 sm:p-6">
-                <AlertDialogHeader>
+              <AlertDialogContent className="max-w-[90vw] sm:max-w-md flex flex-col p-0">
+                <AlertDialogHeader className="px-4 pt-4 pb-2">
                   <AlertDialogTitle>Delete flashcard</AlertDialogTitle>
                   <AlertDialogDescription>
                     Are you sure you want to delete the flashcard for{" "}
@@ -584,7 +597,8 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                     cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
+
+                <AlertDialogFooter className="sticky bottom-0 z-10 bg-background px-4 py-3 border-t">
                   <AlertDialogCancel className="cursor-pointer">
                     Cancel
                   </AlertDialogCancel>
