@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { FlashcardData, FlashcardResponse } from "@/types/flashcard";
 import {
   BookOpen,
@@ -21,9 +22,9 @@ import {
   Search,
 } from "lucide-react";
 import { Session } from "next-auth";
+import { getSession } from "next-auth/react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -50,16 +51,20 @@ export function DashboardClient({ session }: { session: Session }) {
   const MAX_WORD_LENGTH = 50;
 
   const fetchFlashcards = async (currentPage = 0) => {
-    if (!session?.user?.id) return;
-
     setIsLoadingCards(true);
+
     try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
       const res = await fetch(
-        `${apiUrl}/flashcards?user_id=${session.user.id}&skip=${
-          currentPage * pageSize
-        }&limit=${pageSize}`
+        `${apiUrl}/flashcards?skip=${currentPage * pageSize}&limit=${pageSize}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
       if (!res.ok) throw new Error("Failed to fetch flashcards");
+
       const data = await res.json();
       setAllFlashcards(data.flashcards);
       setTotalFlashcards(data.total);
@@ -97,12 +102,17 @@ export function DashboardClient({ session }: { session: Session }) {
     setIsLoading(true);
 
     try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
       const res = await fetch(`${apiUrl}/flashcard`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           word: text,
-          userId: session?.user?.id,
         }),
       });
 
@@ -128,8 +138,14 @@ export function DashboardClient({ session }: { session: Session }) {
 
   const deleteFlashcard = async (flashcardId: string) => {
     try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
       const res = await fetch(`${apiUrl}/flashcard/${flashcardId}`, {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!res.ok) {
@@ -150,19 +166,18 @@ export function DashboardClient({ session }: { session: Session }) {
     flashcardId: string,
     data: Partial<FlashcardData>
   ) => {
-    if (!session?.user?.id) return;
+    const session = await getSession();
+    const token = session?.accessToken;
 
     try {
-      const res = await fetch(
-        `${apiUrl}/flashcard/${flashcardId}?user_id=${session.user.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        }
-      );
+      const res = await fetch(`${apiUrl}/flashcard/${flashcardId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
 
       if (!res.ok) {
         throw new Error(`Server responded with ${res.status}`);

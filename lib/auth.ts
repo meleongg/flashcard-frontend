@@ -1,11 +1,10 @@
-// lib/auth.ts
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import jwt from "jsonwebtoken";
 import { getServerSession, NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { db } from "./db";
 
 export const authOptions: NextAuthOptions = {
-  // store sessions, accounts, users, etc. in NeonDB
   adapter: PrismaAdapter(db),
   providers: [
     GoogleProvider({
@@ -13,14 +12,24 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  session: { strategy: "database" },
+  session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
   },
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
+    async jwt({ token, user }) {
+      if (user) token.id = user.id;
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token.id) {
+        session.user.id = token.id as string;
+        // Sign a short-lived JWT for backend use using NextAuth secret
+        session.accessToken = jwt.sign(
+          { id: token.id },
+          process.env.NEXTAUTH_SECRET!,
+          { algorithm: "HS256", expiresIn: "1h" }
+        );
       }
       return session;
     },
