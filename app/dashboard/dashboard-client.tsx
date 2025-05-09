@@ -11,11 +11,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { BookOpen, Lightbulb, Loader, Search } from "lucide-react";
+import { FlashcardResponse } from "@/types/flashcard";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Lightbulb,
+  Loader,
+  Search,
+} from "lucide-react";
 import { Session } from "next-auth";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { FlashcardResponse } from "@/types/flashcard";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -32,27 +39,38 @@ export function DashboardClient({ session }: { session: Session }) {
     notes: string;
   }>(null);
   const [allFlashcards, setAllFlashcards] = useState<FlashcardResponse[]>([]);
-
+  const [page, setPage] = useState(0);
+  const pageSize = 5;
+  const [isLoadingCards, setIsLoadingCards] = useState(false);
+  const [totalFlashcards, setTotalFlashcards] = useState(0);
   const resultRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fetchFlashcards = async () => {
+  const fetchFlashcards = async (currentPage = 0) => {
     if (!session?.user?.id) return;
+
+    setIsLoadingCards(true);
     try {
       const res = await fetch(
-        `${apiUrl}/flashcards?user_id=${session.user.id}`
+        `${apiUrl}/flashcards?user_id=${session.user.id}&skip=${
+          currentPage * pageSize
+        }&limit=${pageSize}`
       );
       if (!res.ok) throw new Error("Failed to fetch flashcards");
       const data = await res.json();
       setAllFlashcards(data);
+      setTotalFlashcards(data.total);
     } catch (err) {
       console.error("Error fetching flashcards:", err);
+      toast.error("Failed to load flashcards");
+    } finally {
+      setIsLoadingCards(false);
     }
   };
 
   useEffect(() => {
-    fetchFlashcards();
-  }, [session]);
+    fetchFlashcards(page);
+  }, [session, page]);
 
   const handleSubmit = async () => {
     if (!text.trim()) {
@@ -193,18 +211,69 @@ export function DashboardClient({ session }: { session: Session }) {
 
       {allFlashcards.length > 0 && (
         <div className="space-y-4 mt-8">
-          <h2 className="text-xl font-semibold">Your Saved Flashcards</h2>
-          {allFlashcards.map((fc) => (
-            <FlashcardResult
-              key={fc.id}
-              word={fc.word}
-              translation={fc.translation}
-              phonetic={fc.phonetic}
-              pos={fc.pos}
-              example={fc.example}
-              notes={fc.notes}
-            />
-          ))}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Your Saved Flashcards</h2>
+            <p className="text-sm text-muted-foreground">
+              {/* Calculate the range of flashcards being shown */}
+              Showing {page * pageSize + 1}-
+              {Math.min((page + 1) * pageSize, totalFlashcards)} of{" "}
+              {totalFlashcards}
+            </p>
+          </div>
+
+          {isLoadingCards ? (
+            <div className="flex justify-center py-8">
+              <Loader className="animate-spin h-8 w-8 text-primary" />
+            </div>
+          ) : (
+            <>
+              {allFlashcards.map((fc) => (
+                <FlashcardResult
+                  key={fc.id}
+                  word={fc.word}
+                  translation={fc.translation}
+                  phonetic={fc.phonetic}
+                  pos={fc.pos}
+                  example={fc.example}
+                  notes={fc.notes}
+                />
+              ))}
+
+              <div className="flex justify-center items-center gap-4 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(Math.max(0, page - 1))}
+                  disabled={page === 0 || isLoadingCards}
+                  className="cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                </Button>
+
+                {/* Calculate total pages */}
+                {(() => {
+                  const totalPages = Math.ceil(totalFlashcards / pageSize);
+                  return (
+                    <span className="text-sm">
+                      Page {page + 1} of {totalPages}
+                    </span>
+                  );
+                })()}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={
+                    (page + 1) * pageSize >= totalFlashcards || isLoadingCards
+                  }
+                  className="cursor-pointer"
+                >
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

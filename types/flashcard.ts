@@ -1,3 +1,8 @@
+export type PaginatedFlashcardResponse = {
+  total: number;
+  flashcards: FlashcardResponse[];
+};
+
 export type FlashcardResponse = {
   id: string;
   word: string;
