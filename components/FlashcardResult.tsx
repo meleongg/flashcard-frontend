@@ -20,6 +20,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
@@ -32,6 +51,7 @@ import {
   Bookmark,
   CheckCircle,
   Copy,
+  Edit,
   Loader,
   Share,
   Trash2,
@@ -73,6 +93,7 @@ const posColors: Record<string, string> = {
 interface FlashcardResultProps extends FlashcardData {
   id?: string;
   onDelete?: (id: string) => Promise<void>;
+  onEdit?: (id: string, data: Partial<FlashcardData>) => Promise<void>;
 }
 
 export const FlashcardResult: React.FC<FlashcardResultProps> = ({
@@ -84,9 +105,21 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
   example,
   notes,
   onDelete,
+  onEdit,
 }) => {
   const [saved, setSaved] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // State for edit form
+  const [editForm, setEditForm] = useState({
+    word,
+    translation,
+    phonetic,
+    pos,
+    example,
+    notes,
+  });
 
   const copyToClipboard = () => {
     const content = `
@@ -126,6 +159,38 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
       console.error("Delete error:", err);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSelectChange = (value: string) => {
+    setEditForm((prev) => ({
+      ...prev,
+      pos: value,
+    }));
+  };
+
+  const handleEditSubmit = async () => {
+    if (!id || !onEdit) return;
+
+    setIsEditing(true);
+    try {
+      await onEdit(id, editForm);
+      toast.success("Flashcard updated successfully");
+    } catch (err) {
+      console.error("Edit error:", err);
+      toast.error("Failed to update flashcard");
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -236,6 +301,114 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
           >
             <Share className="h-4 w-4 mr-1" /> Share
           </Button>
+
+          {/* Edit Button and Dialog */}
+          {id && onEdit && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                >
+                  <Edit className="h-4 w-4 mr-1" /> Edit
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Edit flashcard</DialogTitle>
+                  <DialogDescription>
+                    Make changes to your flashcard below.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="word">Word</Label>
+                    <Input
+                      id="word"
+                      name="word"
+                      value={editForm.word}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="translation">Translation</Label>
+                    <Input
+                      id="translation"
+                      name="translation"
+                      value={editForm.translation}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="phonetic">Phonetic</Label>
+                    <Input
+                      id="phonetic"
+                      name="phonetic"
+                      value={editForm.phonetic}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="pos">Part of Speech</Label>
+                    <Select
+                      value={editForm.pos}
+                      onValueChange={handleSelectChange}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select part of speech" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(posDescriptions).map(([key, value]) => (
+                          <SelectItem key={key} value={key}>
+                            {value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="example">Example</Label>
+                    <Textarea
+                      id="example"
+                      name="example"
+                      value={editForm.example}
+                      onChange={handleInputChange}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      value={editForm.notes}
+                      onChange={handleInputChange}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    onClick={handleEditSubmit}
+                    disabled={isEditing}
+                  >
+                    {isEditing ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin mr-1" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save changes"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Existing Delete Button and Dialog */}
           {id && onDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>

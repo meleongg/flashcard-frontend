@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { FlashcardResponse } from "@/types/flashcard";
+import { FlashcardData, FlashcardResponse } from "@/types/flashcard";
 import {
   BookOpen,
   ChevronLeft,
@@ -127,6 +127,38 @@ export function DashboardClient({ session }: { session: Session }) {
     } catch (error) {
       console.error("Delete error:", error);
       toast.error("Failed to delete flashcard");
+      throw error;
+    }
+  };
+
+  const editFlashcard = async (
+    flashcardId: string,
+    data: Partial<FlashcardData>
+  ) => {
+    if (!session?.user?.id) return;
+
+    try {
+      const res = await fetch(
+        `${apiUrl}/flashcard/${flashcardId}?user_id=${session.user.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
+      }
+
+      // Refresh the flashcards list to show the updated content
+      await fetchFlashcards(page);
+      toast.success("Flashcard updated successfully");
+    } catch (error) {
+      console.error("Edit error:", error);
+      toast.error("Failed to update flashcard");
       throw error;
     }
   };
@@ -258,6 +290,7 @@ export function DashboardClient({ session }: { session: Session }) {
                   example={fc.example}
                   notes={fc.notes}
                   onDelete={deleteFlashcard}
+                  onEdit={editFlashcard}
                 />
               ))}
 
