@@ -5,13 +5,15 @@ import { FlashcardDetailClient } from "./flashcard-detail-client";
 export default async function FlashcardDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
+
   const session = await getAuthSession();
 
   if (!session?.user) {
     redirect("/login");
   }
 
-  return <FlashcardDetailClient id={params.id} session={session} />;
+  return <FlashcardDetailClient id={id} session={session} />;
 }
