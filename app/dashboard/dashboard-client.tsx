@@ -38,7 +38,18 @@ import { Toaster, toast } from "sonner";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-// Add this helper function to get full language names
+const posDescriptions: Record<string, string> = {
+  NOUN: "Noun",
+  VERB: "Verb",
+  ADJ: "Adjective",
+  ADV: "Adverb",
+  PRON: "Pronoun",
+  PREP: "Preposition",
+  CONJ: "Conjunction",
+  INTJ: "Interjection",
+  DET: "Determiner",
+};
+
 const getLanguageName = (code: string): string => {
   const languages: Record<string, string> = {
     en: "English",
@@ -74,7 +85,7 @@ export function DashboardClient({ session }: { session: Session }) {
   const [previewFlashcard, setPreviewFlashcard] =
     useState<FlashcardData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [languageDirection, setLanguageDirection] = useState<string>("en-zh");
+  const [languageDirection, setLanguageDirection] = useState<string>("auto-en");
   const MAX_WORD_LENGTH = 50;
 
   const fetchFolders = async () => {
@@ -128,7 +139,6 @@ export function DashboardClient({ session }: { session: Session }) {
       if (!res.ok) throw new Error(`Failed to fetch flashcards: ${res.status}`);
 
       const data = await res.json();
-      console.log("Received flashcards data:", data);
 
       setAllFlashcards(data.flashcards);
       setTotalFlashcards(data.total);
@@ -330,7 +340,10 @@ export function DashboardClient({ session }: { session: Session }) {
       const payload = {
         ...previewFlashcard,
         folder_id: selectedFolderId === "none" ? "" : selectedFolderId,
-        source_lang: sourceLanguage,
+        source_lang:
+          sourceLanguage === "auto"
+            ? previewFlashcard.source_lang
+            : sourceLanguage,
         target_lang: targetLanguage,
       };
 
@@ -410,6 +423,12 @@ export function DashboardClient({ session }: { session: Session }) {
                   <SelectValue placeholder="Translate" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="auto-zh">Auto → Mandarin</SelectItem>
+                  <SelectItem value="auto-en">Auto → English</SelectItem>
+                  <SelectItem value="auto-es">Auto → Spanish</SelectItem>
+                  <SelectItem value="auto-fr">Auto → French</SelectItem>
+                  <SelectItem value="auto-ja">Auto → Japanese</SelectItem>
+
                   <SelectItem value="en-zh">English → Mandarin</SelectItem>
                   <SelectItem value="zh-en">Mandarin → English</SelectItem>
                   <SelectItem value="en-es">English → Spanish</SelectItem>
@@ -444,14 +463,78 @@ export function DashboardClient({ session }: { session: Session }) {
       {/* Preview Card */}
       {previewFlashcard && (
         <Card className="border-2 border-primary/20">
+          {/* Language direction in preview card */}
           <CardHeader className="bg-primary/5 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-xl">Preview Flashcard</CardTitle>
-              <CardDescription>
-                {getLanguageName(languageDirection.split("-")[0])} →{" "}
-                {getLanguageName(languageDirection.split("-")[1])}
-              </CardDescription>
+              {isEditing ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <Select
+                    value={
+                      languageDirection.startsWith("auto") &&
+                      previewFlashcard.source_lang
+                        ? previewFlashcard.source_lang
+                        : languageDirection.split("-")[0]
+                    }
+                    onValueChange={(val) => {
+                      // Keep target language, change source language
+                      const targetLang = languageDirection.split("-")[1];
+                      setLanguageDirection(`${val}-${targetLang}`);
+                      updatePreview("source_lang", val);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="zh">Mandarin</SelectItem>
+                      <SelectItem value="es">Spanish</SelectItem>
+                      <SelectItem value="fr">French</SelectItem>
+                      <SelectItem value="ja">Japanese</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm">→</span>
+                  <Select
+                    value={languageDirection.split("-")[1]}
+                    onValueChange={(val) => {
+                      // Keep source language, change target language
+                      const sourceLang =
+                        languageDirection.startsWith("auto") &&
+                        previewFlashcard.source_lang
+                          ? previewFlashcard.source_lang
+                          : languageDirection.split("-")[0];
+                      setLanguageDirection(`${sourceLang}-${val}`);
+                      updatePreview("target_lang", val);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="zh">Mandarin</SelectItem>
+                      <SelectItem value="es">Spanish</SelectItem>
+                      <SelectItem value="fr">French</SelectItem>
+                      <SelectItem value="ja">Japanese</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <CardDescription>
+                  {languageDirection.startsWith("auto")
+                    ? `${
+                        previewFlashcard.source_lang
+                          ? getLanguageName(previewFlashcard.source_lang)
+                          : "Auto-detect"
+                      } → ${getLanguageName(languageDirection.split("-")[1])}`
+                    : `${getLanguageName(
+                        languageDirection.split("-")[0]
+                      )} → ${getLanguageName(languageDirection.split("-")[1])}`}
+                </CardDescription>
+              )}
             </div>
+
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleDiscard}>
                 Discard
@@ -505,7 +588,89 @@ export function DashboardClient({ session }: { session: Session }) {
                 )}
               </div>
 
-              {/* Other editable fields - pronunciation, examples, etc */}
+              {/* Phonetic pronunciation */}
+              <div className="grid gap-2">
+                <Label htmlFor="phonetic">Pronunciation</Label>
+                {isEditing ? (
+                  <Input
+                    id="phonetic"
+                    value={previewFlashcard.phonetic}
+                    onChange={(e) => updatePreview("phonetic", e.target.value)}
+                    placeholder="Phonetic pronunciation"
+                  />
+                ) : (
+                  <div className="text-base font-mono">
+                    {previewFlashcard.phonetic || "—"}
+                  </div>
+                )}
+              </div>
+
+              {/* Part of speech */}
+              <div className="grid gap-2">
+                <Label htmlFor="pos">Part of Speech</Label>
+                {isEditing ? (
+                  <Select
+                    value={previewFlashcard.pos}
+                    onValueChange={(val) => updatePreview("pos", val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NOUN">Noun</SelectItem>
+                      <SelectItem value="VERB">Verb</SelectItem>
+                      <SelectItem value="ADJ">Adjective</SelectItem>
+                      <SelectItem value="ADV">Adverb</SelectItem>
+                      <SelectItem value="PRON">Pronoun</SelectItem>
+                      <SelectItem value="PREP">Preposition</SelectItem>
+                      <SelectItem value="CONJ">Conjunction</SelectItem>
+                      <SelectItem value="INTJ">Interjection</SelectItem>
+                      <SelectItem value="DET">Determiner</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-base">
+                    {posDescriptions[previewFlashcard.pos] ||
+                      previewFlashcard.pos}
+                  </div>
+                )}
+              </div>
+
+              {/* Example sentence */}
+              <div className="grid gap-2">
+                <Label htmlFor="example">Example</Label>
+                {isEditing ? (
+                  <textarea
+                    id="example"
+                    value={previewFlashcard.example}
+                    onChange={(e) => updatePreview("example", e.target.value)}
+                    className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    placeholder="Example sentence using this word"
+                  ></textarea>
+                ) : (
+                  <div className="text-base italic">
+                    "{previewFlashcard.example || "—"}"
+                  </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div className="grid gap-2">
+                <Label htmlFor="notes">Notes</Label>
+                {isEditing ? (
+                  <textarea
+                    id="notes"
+                    value={previewFlashcard.notes}
+                    onChange={(e) => updatePreview("notes", e.target.value)}
+                    className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    placeholder="Any additional notes about the word"
+                  ></textarea>
+                ) : (
+                  <div className="text-base">
+                    {previewFlashcard.notes || "—"}
+                  </div>
+                )}
+              </div>
 
               {/* Folder selection */}
               <div className="grid gap-2">
