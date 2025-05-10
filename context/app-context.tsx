@@ -38,10 +38,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Add a folder to recent folders
   const addRecentFolder = (folder: Folder) => {
     setRecentFolders((prev) => {
-      // Remove if already exists
-      const filtered = prev.filter((f) => f.id !== folder.id);
-      // Add to beginning, limit to 5 recent folders
-      return [folder, ...filtered].slice(0, 5);
+      const exists = prev.find((f) => f.id === folder.id);
+      if (exists) {
+        // Move to top
+        return [folder, ...prev.filter((f) => f.id !== folder.id)];
+      }
+      return [folder, ...prev].slice(0, 5);
     });
   };
 

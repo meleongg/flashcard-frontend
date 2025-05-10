@@ -3,14 +3,23 @@
 import { FlashcardResult } from "@/components/FlashcardResult";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppContext } from "@/context/app-context"; // Add this import
+import { useAppContext } from "@/context/app-context";
 import { apiUrl } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { FlashcardData, FlashcardResponse } from "@/types/flashcard";
 import { Folder as FlashcardFolder } from "@/types/folder";
 import {
@@ -20,33 +29,38 @@ import {
   Grid,
   List,
   Loader,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const pageSize = 5;
+const pageSize = 10; // Increased from 5 for better mobile experience
 
 export function FlashcardsClient({ session }: { session: Session }) {
-  // Get shared state from context
   const {
     selectedFolderId,
     setSelectedFolderId,
     addRecentFolder,
+    recentFolders,
     viewMode,
     setViewMode,
-    flashcardsVersion, // Use to trigger refetches
+    flashcardsVersion,
   } = useAppContext();
 
-  // Keep local state for things not shared across pages
   const [page, setPage] = useState(0);
   const [folders, setFolders] = useState<FlashcardFolder[]>([]);
   const [allFlashcards, setAllFlashcards] = useState<FlashcardResponse[]>([]);
   const [totalFlashcards, setTotalFlashcards] = useState(0);
   const [isLoadingCards, setIsLoadingCards] = useState(false);
 
+  const recentFolderIds = new Set(recentFolders.map((f) => f.id));
+  const nonRecentFolders = folders.filter((f) => !recentFolderIds.has(f.id));
+
+  // Original fetch functions remain the same
   const fetchFolders = async () => {
+    // Same implementation as before
     try {
       const session = await getSession();
       const token = session?.accessToken;
@@ -67,6 +81,7 @@ export function FlashcardsClient({ session }: { session: Session }) {
   };
 
   const fetchFlashcards = async (currentPage = 0) => {
+    // Same implementation as before
     setIsLoadingCards(true);
 
     try {
@@ -80,7 +95,6 @@ export function FlashcardsClient({ session }: { session: Session }) {
       if (selectedFolderId !== "all") {
         url.searchParams.append("folder_id", selectedFolderId);
 
-        // Add current folder to recent folders list when viewing it
         const currentFolder = folders.find((f) => f.id === selectedFolderId);
         if (currentFolder) {
           addRecentFolder(currentFolder);
@@ -96,7 +110,6 @@ export function FlashcardsClient({ session }: { session: Session }) {
       if (!res.ok) throw new Error(`Failed to fetch flashcards: ${res.status}`);
 
       const data = await res.json();
-
       setAllFlashcards(data.flashcards);
       setTotalFlashcards(data.total);
     } catch (err) {
@@ -108,6 +121,7 @@ export function FlashcardsClient({ session }: { session: Session }) {
   };
 
   const deleteFlashcard = async (flashcardId: string) => {
+    // Same implementation
     try {
       const session = await getSession();
       const token = session?.accessToken;
@@ -137,6 +151,7 @@ export function FlashcardsClient({ session }: { session: Session }) {
     flashcardId: string,
     data: Partial<FlashcardData & { folder_id?: string }>
   ) => {
+    // Same implementation
     const session = await getSession();
     const token = session?.accessToken;
 
@@ -154,7 +169,6 @@ export function FlashcardsClient({ session }: { session: Session }) {
         throw new Error(`Server responded with ${res.status}`);
       }
 
-      // Refresh the flashcards list to show the updated content
       await fetchFlashcards(page);
       toast.success("Flashcard updated successfully");
     } catch (error) {
@@ -164,91 +178,179 @@ export function FlashcardsClient({ session }: { session: Session }) {
     }
   };
 
-  // Fetch functions with updated dependencies
+  // Effects stay the same
   useEffect(() => {
     fetchFolders();
   }, [session]);
 
   useEffect(() => {
     fetchFlashcards(page);
-    // Added flashcardsVersion as dependency to trigger refetch when other pages update cards
   }, [page, selectedFolderId, flashcardsVersion]);
 
+  // Calculate total pages for pagination
+  const totalPages = Math.ceil(totalFlashcards / pageSize);
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Your Flashcards</h1>
+    <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
+      {/* Improved header with better mobile layout */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold sm:text-2xl">Your Flashcards</h1>
 
-        {/* Folder selector using context state */}
-        <div className="flex items-center gap-2">
+          {/* Mobile-optimized controls group */}
           <div className="flex items-center gap-2">
-            <Folder className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Viewing:</span>
+            {/* View toggle */}
+            <div className="flex items-center rounded-md border">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "h-8 px-2 sm:px-3",
+                  viewMode === "list" && "bg-muted"
+                )}
+              >
+                <List className="h-4 w-4" />
+                <span className="ml-2 hidden sm:inline">List</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "h-8 px-2 sm:px-3",
+                  viewMode === "grid" && "bg-muted"
+                )}
+              >
+                <Grid className="h-4 w-4" />
+                <span className="ml-2 hidden sm:inline">Grid</span>
+              </Button>
+            </div>
+
+            {/* Options menu for mobile */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild className="lg:hidden">
+                <Button variant="outline" size="icon" className="h-8 w-8">
+                  <SlidersHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px]">
+                <DropdownMenuItem className="flex flex-col items-start gap-2">
+                  <span className="text-xs font-medium text-muted-foreground w-full">
+                    Folder
+                  </span>
+                  <Select
+                    value={selectedFolderId}
+                    onValueChange={(value) => {
+                      setSelectedFolderId(value);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-full h-8 text-xs">
+                      <SelectValue placeholder="Select folder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Flashcards</SelectItem>
+                      {folders.map((folder) => (
+                        <SelectItem key={folder.id} value={folder.id}>
+                          {folder.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <Select
-            value={selectedFolderId}
-            onValueChange={(value) => {
-              setSelectedFolderId(value);
-              setPage(0); // Reset to first page when changing folders
-            }}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select folder">
-                {selectedFolderId === "all"
-                  ? "All Flashcards"
-                  : folders.find((f) => f.id === selectedFolderId)?.name ||
-                    "Select folder"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Flashcards</SelectItem>
-              {folders.map((folder) => (
-                <SelectItem key={folder.id} value={folder.id}>
-                  {folder.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
-        {/* View mode toggle buttons */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="icon"
-            onClick={() => setViewMode("list")}
-            className="h-8 w-8"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === "grid" ? "default" : "ghost"}
-            size="icon"
-            onClick={() => setViewMode("grid")}
-            className="h-8 w-8"
-          >
-            <Grid className="h-4 w-4" />
-          </Button>
+        {/* Better organized controls row - hidden on mobile, shown in options menu instead */}
+        <div className="hidden lg:flex items-center justify-between">
+          {/* Folder selector */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Folder className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Folder:</span>
+            </div>
+            <Select
+              value={selectedFolderId}
+              onValueChange={(value) => {
+                setSelectedFolderId(value);
+                setPage(0);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select folder" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Flashcards</SelectItem>
+
+                {recentFolders.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Recent Folders</SelectLabel>
+                    {recentFolders.map((folder) => (
+                      <SelectItem key={`recent-${folder.id}`} value={folder.id}>
+                        {folder.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+
+                {nonRecentFolders.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>All Folders</SelectLabel>
+                    {nonRecentFolders.map((folder) => (
+                      <SelectItem key={`all-${folder.id}`} value={folder.id}>
+                        {folder.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Count display */}
+          <p className="text-sm text-muted-foreground">
+            {totalFlashcards > 0 && (
+              <>
+                Showing {page * pageSize + 1}-
+                {Math.min((page + 1) * pageSize, totalFlashcards)} of{" "}
+                {totalFlashcards}
+              </>
+            )}
+          </p>
         </div>
 
-        <p className="text-sm text-muted-foreground sm:ml-auto">
-          {totalFlashcards > 0 && (
-            <>
-              Showing {page * pageSize + 1}-
-              {Math.min((page + 1) * pageSize, totalFlashcards)} of{" "}
-              {totalFlashcards}
-            </>
-          )}
-        </p>
+        {/* Mobile-only count display - simplified */}
+        <div className="flex lg:hidden justify-center">
+          <div className="px-3 py-1 bg-muted rounded-full">
+            <p className="text-xs text-muted-foreground">
+              {(() => {
+                // Get folder once to avoid duplicate lookups
+                if (selectedFolderId !== "all") {
+                  const folder = folders.find((f) => f.id === selectedFolderId);
+                  if (folder) {
+                    return (
+                      <span className="font-medium mr-1">{folder.name}:</span>
+                    );
+                  }
+                }
+                return null;
+              })()}
+              {totalFlashcards} card{totalFlashcards !== 1 && "s"}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Flashcards in either grid or list view based on viewMode */}
+      {/* Improved flashcards grid with better responsiveness */}
       <div
-        className={
+        className={cn(
           viewMode === "grid"
-            ? "grid grid-cols-1 sm:grid-cols-2 gap-4"
+            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
             : "space-y-4"
-        }
+        )}
       >
         {isLoadingCards ? (
           <div className="flex justify-center py-8 col-span-full">
@@ -269,63 +371,62 @@ export function FlashcardsClient({ session }: { session: Session }) {
                 folderId={fc.folder_id}
                 folderName={folders.find((f) => f.id === fc.folder_id)?.name}
                 folders={folders}
-                sourceLang={fc.source_lang}
-                targetLang={fc.target_lang}
+                source_lang={fc.source_lang}
+                target_lang={fc.target_lang}
                 onDelete={deleteFlashcard}
                 onEdit={editFlashcard}
                 viewMode={viewMode}
               />
             ))}
 
-            {/* Pagination */}
-            <div
-              className={`flex justify-center items-center gap-4 pt-4 ${
-                viewMode === "grid" ? "col-span-full" : ""
-              }`}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(Math.max(0, page - 1))}
-                disabled={page === 0 || isLoadingCards}
-                className="cursor-pointer"
+            {/* Simplified pagination */}
+            {totalPages > 1 && (
+              <div
+                className={cn(
+                  "flex justify-center items-center gap-3 pt-6",
+                  viewMode === "grid" && "col-span-full"
+                )}
               >
-                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(Math.max(0, page - 1))}
+                  disabled={page === 0 || isLoadingCards}
+                  className="h-8 px-2 sm:px-3"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="ml-1 hidden sm:inline">Previous</span>
+                </Button>
 
-              {/* Calculate total pages */}
-              {(() => {
-                const totalPages = Math.ceil(totalFlashcards / pageSize);
-                return (
-                  <span className="text-sm">
-                    Page {page + 1} of {totalPages}
-                  </span>
-                );
-              })()}
+                <span className="text-sm">
+                  <span className="hidden sm:inline">Page </span>
+                  {page + 1} / {totalPages}
+                </span>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(page + 1)}
-                disabled={
-                  (page + 1) * pageSize >= totalFlashcards || isLoadingCards
-                }
-                className="cursor-pointer"
-              >
-                Next <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={
+                    (page + 1) * pageSize >= totalFlashcards || isLoadingCards
+                  }
+                  className="h-8 px-2 sm:px-3"
+                >
+                  <span className="mr-1 hidden sm:inline">Next</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div
-            className={`flex flex-col items-center justify-center py-8 text-center ${
-              viewMode === "grid" ? "col-span-full" : ""
-            }`}
+            className={cn(
+              "flex flex-col items-center justify-center py-8 text-center",
+              viewMode === "grid" && "col-span-full"
+            )}
           >
-            <div className="bg-muted/30 p-6 rounded-lg max-w-md">
-              <p className="text-muted-foreground mb-2 font-medium">
-                No flashcards found
-              </p>
+            <div className="bg-muted/20 p-6 rounded-lg max-w-md">
+              <p className="font-medium mb-2">No flashcards found</p>
               <p className="text-sm text-muted-foreground">
                 {selectedFolderId !== "all"
                   ? "This folder doesn't contain any flashcards yet."
