@@ -166,6 +166,7 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
   const [formErrors, setFormErrors] = useState<
     Record<string, string | undefined>
   >({});
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const copyToClipboard = () => {
     const content = `
@@ -214,7 +215,99 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
   };
 
   const playPronunciation = () => {
-    toast.info("Playing pronunciation...");
+    // Check if browser supports speech synthesis
+    if (!("speechSynthesis" in window)) {
+      toast.error("Your browser doesn't support text to speech");
+      return;
+    }
+
+    setIsSpeaking(true);
+
+    // Create speech synthesis utterance
+    const utterance = new SpeechSynthesisUtterance(word);
+
+    // Add event listeners to track when speech has finished
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      toast.error("Failed to play pronunciation");
+    };
+
+    // Set the language based on the flashcard's source language
+    if (sourceLang) {
+      // Map language code to BCP-47 language tag format required by SpeechSynthesis
+      const langMap: Record<string, string> = {
+        en: "en-US",
+        zh: "zh-CN",
+        es: "es-ES",
+        fr: "fr-FR",
+        ja: "ja-JP",
+        de: "de-DE",
+        ru: "ru-RU",
+        it: "it-IT",
+        pt: "pt-PT",
+        ko: "ko-KR",
+      };
+
+      utterance.lang = langMap[sourceLang] || sourceLang;
+    }
+
+    // Optional: Set other properties
+    utterance.rate = 0.9; // Slightly slower than default
+    utterance.volume = 1.0;
+
+    // Play the speech
+    window.speechSynthesis.cancel(); // Cancel any ongoing speech
+    window.speechSynthesis.speak(utterance);
+
+    // Show toast message
+    toast.info(`Playing "${word}" in ${getLanguageName(sourceLang || "en")}`);
+  };
+
+  const playTranslation = () => {
+    if (!("speechSynthesis" in window)) {
+      toast.error("Your browser doesn't support text to speech");
+      return;
+    }
+
+    setIsSpeaking(true);
+
+    const utterance = new SpeechSynthesisUtterance(translation);
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      toast.error("Failed to play pronunciation");
+    };
+
+    // Use target language for the translation
+    if (targetLang) {
+      const langMap: Record<string, string> = {
+        en: "en-US",
+        zh: "zh-CN",
+        es: "es-ES",
+        fr: "fr-FR",
+        ja: "ja-JP",
+        de: "de-DE",
+        ru: "ru-RU",
+        it: "it-IT",
+        pt: "pt-PT",
+        ko: "ko-KR",
+      };
+
+      utterance.lang = langMap[targetLang] || targetLang;
+    }
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+
+    toast.info(`Playing translation in ${getLanguageName(targetLang || "en")}`);
   };
 
   const handleDelete = async () => {
@@ -347,20 +440,61 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
           <TabsContent value="study" className="space-y-3 sm:space-y-4">
             <div className="flex flex-col gap-2 pb-2 border-b">
               <div>
-                <h2 className="text-xl sm:text-3xl font-bold">{word}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl sm:text-3xl font-bold">{word}</h2>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={playPronunciation}
+                          disabled={isSpeaking}
+                          className="h-6 w-6 rounded-full cursor-pointer"
+                        >
+                          {isSpeaking ? (
+                            <Loader className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Volume2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          Play {getLanguageName(sourceLang || "en")}{" "}
+                          pronunciation
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-base sm:text-lg text-muted-foreground">
                     {translation}
                   </span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={playPronunciation}
-                    className="h-6 w-6 rounded-full cursor-pointer"
-                  >
-                    <Volume2 className="h-4 w-4" />
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={playTranslation}
+                          disabled={isSpeaking}
+                          className="h-6 w-6 rounded-full cursor-pointer"
+                        >
+                          <Volume2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          Play {getLanguageName(targetLang || "en")} translation
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
+
                 <div className="text-xs sm:text-sm italic text-muted-foreground">
                   {phonetic}
                 </div>
