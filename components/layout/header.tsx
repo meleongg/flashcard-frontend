@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LogOut, Settings, User } from "lucide-react";
+import { useLayout } from "@/context/layout-context";
+import { ChevronDown, LogOut, Menu, Settings, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,6 +18,7 @@ import { usePathname } from "next/navigation";
 export function Header() {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const { toggleSidebar } = useLayout();
 
   // Function to generate page title based on current path
   const getPageTitle = () => {
@@ -29,13 +31,26 @@ export function Header() {
   };
 
   return (
-    <header className="border-b bg-background sticky top-0 z-10">
-      <div className="flex h-16 items-center px-6 justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
+    <header className="border-b bg-background sticky top-0 z-20">
+      <div className="flex h-16 items-center px-4 md:px-6 justify-between">
+        <div className="flex items-center gap-3">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={toggleSidebar}
+            aria-label="Toggle menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+
+          <h1 className="text-lg md:text-xl font-semibold truncate">
+            {getPageTitle()}
+          </h1>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           {session?.user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
