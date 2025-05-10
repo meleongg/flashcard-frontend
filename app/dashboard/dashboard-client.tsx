@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -59,6 +60,9 @@ export function DashboardClient({ session }: { session: Session }) {
   const [inputError, setInputError] = useState<string | null>(null);
   const [folders, setFolders] = useState<FlashcardFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
+  const [previewFlashcard, setPreviewFlashcard] =
+    useState<FlashcardData | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const MAX_WORD_LENGTH = 50;
 
   const fetchFolders = async () => {
@@ -252,6 +256,91 @@ export function DashboardClient({ session }: { session: Session }) {
     }
   };
 
+  // Generate preview without saving
+  const handleGenerate = async () => {
+    // Input validation
+    if (!text.trim()) {
+      setInputError("Please enter a word or phrase");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
+      const res = await fetch(`${apiUrl}/flashcard-preview`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ word: text }),
+      });
+
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      const data = await res.json();
+
+      // Set as preview (doesn't save to backend yet)
+      setPreviewFlashcard(data);
+      setIsEditing(false); // Start in view mode, not edit mode
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate flashcard");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update preview state when editing
+  const updatePreview = (field: keyof FlashcardData, value: string) => {
+    setPreviewFlashcard((prev) => (prev ? { ...prev, [field]: value } : null));
+  };
+
+  // Save the flashcard to backend
+  const handleSave = async () => {
+    if (!previewFlashcard) return;
+
+    try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
+      const payload = {
+        ...previewFlashcard,
+        folder_id: selectedFolderId === "none" ? "" : selectedFolderId,
+      };
+
+      const res = await fetch(`${apiUrl}/flashcard`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+
+      // Success - update the flashcard list
+      await fetchFlashcards(page);
+      toast.success("Flashcard saved successfully");
+
+      // Reset the form
+      setText("");
+      setPreviewFlashcard(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save flashcard");
+    }
+  };
+
+  // Discard the preview
+  const handleDiscard = () => {
+    setPreviewFlashcard(null);
+    // Optionally clear the input too
+    // setText("");
+  };
+
   return (
     <main className="p-6 max-w-2xl mx-auto space-y-6">
       <div className="flex justify-end">
@@ -266,17 +355,15 @@ export function DashboardClient({ session }: { session: Session }) {
           </CardTitle>
           <CardDescription>
             Enter a word or short phrase to generate a language learning
-            flashcard with translation and usage examples.
+            flashcard
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2">
-            <label htmlFor="word-input" className="text-sm font-medium">
-              Word or Phrase
-            </label>
+            {/* Input Area */}
             <div className="flex gap-2">
               <Input
-                id="word-input"
                 ref={inputRef}
                 value={text}
                 onChange={(e) => {
@@ -284,16 +371,28 @@ export function DashboardClient({ session }: { session: Session }) {
                   if (inputError) setInputError(null);
                 }}
                 onKeyDown={handleKeyPress}
-                placeholder="Enter a word or phrase (e.g., hello, good morning)"
-                className={cn(
-                  "flex-1",
-                  inputError && "border-red-500 focus-visible:ring-red-500"
-                )}
+                placeholder="Enter a word or phrase..."
+                className={cn("flex-1", inputError && "border-red-500")}
                 disabled={isLoading}
                 maxLength={MAX_WORD_LENGTH}
               />
+
+              {/* Source language selector */}
+              <Select defaultValue="auto" disabled={isLoading}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-detect</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="es">Spanish</SelectItem>
+                  <SelectItem value="zh">Mandarin</SelectItem>
+                  {/* Add more languages */}
+                </SelectContent>
+              </Select>
+
               <Button
-                onClick={handleSubmit}
+                onClick={handleGenerate}
                 disabled={isLoading}
                 className="gap-1"
               >
@@ -302,19 +401,101 @@ export function DashboardClient({ session }: { session: Session }) {
                 ) : (
                   <Search className="h-4 w-4" />
                 )}
-                {isLoading ? "Generating..." : "Analyze"}
+                {isLoading ? "Generating..." : "Generate"}
               </Button>
             </div>
-            {inputError ? (
-              <p className="text-xs text-red-500">{inputError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Press Enter to submit or click the Analyze button
-              </p>
-            )}
+
+            {/* Error message */}
+            {inputError && <p className="text-xs text-red-500">{inputError}</p>}
           </div>
         </CardContent>
       </Card>
+
+      {/* Preview Card */}
+      {previewFlashcard && (
+        <Card className="border-2 border-primary/20">
+          <CardHeader className="bg-primary/5 flex flex-row items-center justify-between">
+            <CardTitle className="text-xl">Preview Flashcard</CardTitle>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleDiscard}>
+                Discard
+              </Button>
+              <Button size="sm" onClick={handleSave}>
+                Save Flashcard
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid gap-6">
+              {/* Word */}
+              <div className="grid gap-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="word">Word</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setIsEditing(!isEditing)}
+                  >
+                    {isEditing ? "Done" : "Edit"}
+                  </Button>
+                </div>
+                {isEditing ? (
+                  <Input
+                    id="word"
+                    value={previewFlashcard.word}
+                    onChange={(e) => updatePreview("word", e.target.value)}
+                  />
+                ) : (
+                  <div className="text-2xl font-bold">
+                    {previewFlashcard.word}
+                  </div>
+                )}
+              </div>
+
+              {/* Translation */}
+              <div className="grid gap-2">
+                <Label htmlFor="translation">Translation</Label>
+                {isEditing ? (
+                  <Input
+                    id="translation"
+                    value={previewFlashcard.translation}
+                    onChange={(e) =>
+                      updatePreview("translation", e.target.value)
+                    }
+                  />
+                ) : (
+                  <div className="text-lg">{previewFlashcard.translation}</div>
+                )}
+              </div>
+
+              {/* Other editable fields - pronunciation, examples, etc */}
+
+              {/* Folder selection */}
+              <div className="grid gap-2">
+                <Label>Folder</Label>
+                <Select
+                  value={selectedFolderId}
+                  onValueChange={(val) => setSelectedFolderId(val)}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add to folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No folder</SelectItem>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {!result && !isLoading && !error && (
         <div className="flex items-center justify-center p-8 border border-dashed rounded-lg bg-muted/50">
