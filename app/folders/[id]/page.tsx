@@ -5,13 +5,15 @@ import { FolderDetailClient } from "./folder-detail-client";
 export default async function FolderDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
+
   const session = await getAuthSession();
 
   if (!session?.user) {
     redirect("/login");
   }
 
-  return <FolderDetailClient id={params.id} session={session} />;
+  return <FolderDetailClient id={id} session={session} />;
 }
