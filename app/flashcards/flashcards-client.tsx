@@ -9,10 +9,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAppContext } from "@/context/app-context"; // Add this import
 import { apiUrl } from "@/lib/constants";
 import { FlashcardData, FlashcardResponse } from "@/types/flashcard";
 import { Folder as FlashcardFolder } from "@/types/folder";
-import { ChevronLeft, ChevronRight, Folder, Loader } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Folder,
+  Grid,
+  List,
+  Loader,
+} from "lucide-react";
 import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
 import { useEffect, useState } from "react";
@@ -21,8 +29,18 @@ import { toast } from "sonner";
 const pageSize = 5;
 
 export function FlashcardsClient({ session }: { session: Session }) {
+  // Get shared state from context
+  const {
+    selectedFolderId,
+    setSelectedFolderId,
+    addRecentFolder,
+    viewMode,
+    setViewMode,
+    flashcardsVersion, // Use to trigger refetches
+  } = useAppContext();
+
+  // Keep local state for things not shared across pages
   const [page, setPage] = useState(0);
-  const [selectedFolderId, setSelectedFolderId] = useState("all");
   const [folders, setFolders] = useState<FlashcardFolder[]>([]);
   const [allFlashcards, setAllFlashcards] = useState<FlashcardResponse[]>([]);
   const [totalFlashcards, setTotalFlashcards] = useState(0);
@@ -45,7 +63,6 @@ export function FlashcardsClient({ session }: { session: Session }) {
       setFolders(data);
     } catch (err) {
       console.error("Error fetching folders:", err);
-      // Don't show error toast for folders as it's not critical
     }
   };
 
@@ -56,16 +73,18 @@ export function FlashcardsClient({ session }: { session: Session }) {
       const session = await getSession();
       const token = session?.accessToken;
 
-      // Use URL constructor for more robust parameter handling
       const url = new URL(`${apiUrl}/flashcards`);
-
-      // Add query parameters
       url.searchParams.append("skip", (currentPage * pageSize).toString());
       url.searchParams.append("limit", pageSize.toString());
 
-      // Only add folder_id if it's not "all"
       if (selectedFolderId !== "all") {
         url.searchParams.append("folder_id", selectedFolderId);
+
+        // Add current folder to recent folders list when viewing it
+        const currentFolder = folders.find((f) => f.id === selectedFolderId);
+        if (currentFolder) {
+          addRecentFolder(currentFolder);
+        }
       }
 
       const res = await fetch(url.toString(), {
@@ -145,21 +164,22 @@ export function FlashcardsClient({ session }: { session: Session }) {
     }
   };
 
-  // Fetch functions
+  // Fetch functions with updated dependencies
   useEffect(() => {
     fetchFolders();
   }, [session]);
 
   useEffect(() => {
     fetchFlashcards(page);
-  }, [page, selectedFolderId]);
+    // Added flashcardsVersion as dependency to trigger refetch when other pages update cards
+  }, [page, selectedFolderId, flashcardsVersion]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Your Flashcards</h1>
 
-        {/* Folder selector */}
+        {/* Folder selector using context state */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
             <Folder className="h-4 w-4 text-muted-foreground" />
@@ -191,6 +211,26 @@ export function FlashcardsClient({ session }: { session: Session }) {
           </Select>
         </div>
 
+        {/* View mode toggle buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("list")}
+            className="h-8 w-8"
+          >
+            <List className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("grid")}
+            className="h-8 w-8"
+          >
+            <Grid className="h-4 w-4" />
+          </Button>
+        </div>
+
         <p className="text-sm text-muted-foreground sm:ml-auto">
           {totalFlashcards > 0 && (
             <>
@@ -202,10 +242,16 @@ export function FlashcardsClient({ session }: { session: Session }) {
         </p>
       </div>
 
-      {/* Flashcards grid/list */}
-      <div className="space-y-4">
+      {/* Flashcards in either grid or list view based on viewMode */}
+      <div
+        className={
+          viewMode === "grid"
+            ? "grid grid-cols-1 sm:grid-cols-2 gap-4"
+            : "space-y-4"
+        }
+      >
         {isLoadingCards ? (
-          <div className="flex justify-center py-8">
+          <div className="flex justify-center py-8 col-span-full">
             <Loader className="animate-spin h-8 w-8 text-primary" />
           </div>
         ) : allFlashcards.length > 0 ? (
@@ -227,11 +273,16 @@ export function FlashcardsClient({ session }: { session: Session }) {
                 targetLang={fc.target_lang}
                 onDelete={deleteFlashcard}
                 onEdit={editFlashcard}
+                viewMode={viewMode}
               />
             ))}
 
             {/* Pagination */}
-            <div className="flex justify-center items-center gap-4 pt-4">
+            <div
+              className={`flex justify-center items-center gap-4 pt-4 ${
+                viewMode === "grid" ? "col-span-full" : ""
+              }`}
+            >
               <Button
                 variant="outline"
                 size="sm"
@@ -266,7 +317,11 @@ export function FlashcardsClient({ session }: { session: Session }) {
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div
+            className={`flex flex-col items-center justify-center py-8 text-center ${
+              viewMode === "grid" ? "col-span-full" : ""
+            }`}
+          >
             <div className="bg-muted/30 p-6 rounded-lg max-w-md">
               <p className="text-muted-foreground mb-2 font-medium">
                 No flashcards found
