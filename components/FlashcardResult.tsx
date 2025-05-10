@@ -48,17 +48,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { FlashcardData } from "@/types/flashcard";
-import {
-  Bookmark,
-  CheckCircle,
-  Copy,
-  Edit,
-  Folder,
-  Loader,
-  Share,
-  Trash2,
-  Volume2,
-} from "lucide-react";
+import { Copy, Edit, Folder, Loader, Trash2, Volume2 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod"; // You'll need to install zod: npm install zod
@@ -199,15 +189,6 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
     }));
     // Type assertion to tell TypeScript that name is a valid field
     validateField(name as FlashcardField, value);
-  };
-
-  const handleSave = () => {
-    setSaved(true);
-    toast.success("Flashcard saved to your collection");
-  };
-
-  const handleShare = () => {
-    toast.success("Share dialog opened");
   };
 
   const playPronunciation = () => {
@@ -401,14 +382,6 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
             className="cursor-pointer text-xs"
           >
             <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Copy
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleShare}
-            className="cursor-pointer text-xs"
-          >
-            <Share className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Share
           </Button>
 
           {/* Edit Button and Dialog */}
@@ -684,21 +657,6 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
             </AlertDialog>
           )}
         </div>
-
-        <Button
-          size="sm"
-          variant={saved ? "default" : "secondary"}
-          onClick={handleSave}
-          disabled={saved}
-          className="cursor-pointer text-xs w-full sm:w-auto mt-2 sm:mt-0"
-        >
-          {saved ? (
-            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-          ) : (
-            <Bookmark className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-          )}
-          {saved ? "Saved" : "Save"}
-        </Button>
       </CardFooter>
     </Card>
   );
