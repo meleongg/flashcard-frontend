@@ -89,24 +89,31 @@ export function DashboardClient({ session }: { session: Session }) {
       const session = await getSession();
       const token = session?.accessToken;
 
-      // Check if selectedFolderId exists and isn't "all"
-      const folderParam =
-        selectedFolderId && selectedFolderId !== "all"
-          ? `&folder_id=${selectedFolderId}`
-          : "";
+      // Use URL constructor for more robust parameter handling
+      const url = new URL(`${apiUrl}/flashcards`);
 
-      const res = await fetch(
-        `${apiUrl}/flashcards?skip=${
-          currentPage * pageSize
-        }&limit=${pageSize}${folderParam}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      // Add query parameters
+      url.searchParams.append("skip", (currentPage * pageSize).toString());
+      url.searchParams.append("limit", pageSize.toString());
 
-      if (!res.ok) throw new Error("Failed to fetch flashcards");
+      // Only add folder_id if it's not "all"
+      if (selectedFolderId !== "all") {
+        url.searchParams.append("folder_id", selectedFolderId);
+      }
+
+      console.log(`Fetching flashcards from: ${url.toString()}`);
+
+      const res = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error(`Failed to fetch flashcards: ${res.status}`);
 
       const data = await res.json();
+      console.log("Received flashcards data:", data);
+
       setAllFlashcards(data.flashcards);
       setTotalFlashcards(data.total);
     } catch (err) {
@@ -119,8 +126,11 @@ export function DashboardClient({ session }: { session: Session }) {
 
   useEffect(() => {
     fetchFolders();
+  }, [session]);
+
+  useEffect(() => {
     fetchFlashcards(page);
-  }, [session, page]);
+  }, [page, selectedFolderId]);
 
   const handleSubmit = async () => {
     // Reset error states
@@ -147,16 +157,22 @@ export function DashboardClient({ session }: { session: Session }) {
       const session = await getSession();
       const token = session?.accessToken;
 
+      // Only include folder_id in the payload if it's not "all"
+      const payload: { word: string; folder_id?: string } = { word: text };
+
+      if (selectedFolderId !== "all") {
+        payload.folder_id = selectedFolderId;
+      }
+
+      console.log("Creating flashcard with payload:", payload);
+
       const res = await fetch(`${apiUrl}/flashcard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          word: text,
-          folder_id: selectedFolderId,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);
@@ -207,7 +223,7 @@ export function DashboardClient({ session }: { session: Session }) {
 
   const editFlashcard = async (
     flashcardId: string,
-    data: Partial<FlashcardData>
+    data: Partial<FlashcardData & { folder_id?: string }>
   ) => {
     const session = await getSession();
     const token = session?.accessToken;
@@ -359,12 +375,18 @@ export function DashboardClient({ session }: { session: Session }) {
               <Select
                 value={selectedFolderId}
                 onValueChange={(value) => {
+                  console.log(`Changing folder to: ${value}`); // Debug log
                   setSelectedFolderId(value);
                   setPage(0); // Reset to first page when changing folders
                 }}
               >
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select folder" />
+                  <SelectValue placeholder="Select folder">
+                    {selectedFolderId === "all"
+                      ? "All Flashcards"
+                      : folders.find((f) => f.id === selectedFolderId)?.name ||
+                        "Select folder"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Flashcards</SelectItem>
@@ -390,54 +412,77 @@ export function DashboardClient({ session }: { session: Session }) {
             </div>
           ) : (
             <>
-              {allFlashcards.map((fc) => (
-                <FlashcardResult
-                  key={fc.id}
-                  id={fc.id}
-                  word={fc.word}
-                  translation={fc.translation}
-                  phonetic={fc.phonetic}
-                  pos={fc.pos}
-                  example={fc.example}
-                  notes={fc.notes}
-                  onDelete={deleteFlashcard}
-                  onEdit={editFlashcard}
-                />
-              ))}
+              {allFlashcards.length > 0 ? (
+                <>
+                  {allFlashcards.map((fc) => (
+                    <FlashcardResult
+                      key={fc.id}
+                      id={fc.id}
+                      word={fc.word}
+                      translation={fc.translation}
+                      phonetic={fc.phonetic}
+                      pos={fc.pos}
+                      example={fc.example}
+                      notes={fc.notes}
+                      folderId={fc.folder_id}
+                      folderName={
+                        folders.find((f) => f.id === fc.folder_id)?.name
+                      }
+                      folders={folders}
+                      onDelete={deleteFlashcard}
+                      onEdit={editFlashcard}
+                    />
+                  ))}
 
-              <div className="flex justify-center items-center gap-4 pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(Math.max(0, page - 1))}
-                  disabled={page === 0 || isLoadingCards}
-                  className="cursor-pointer"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                </Button>
+                  <div className="flex justify-center items-center gap-4 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(Math.max(0, page - 1))}
+                      disabled={page === 0 || isLoadingCards}
+                      className="cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                    </Button>
 
-                {/* Calculate total pages */}
-                {(() => {
-                  const totalPages = Math.ceil(totalFlashcards / pageSize);
-                  return (
-                    <span className="text-sm">
-                      Page {page + 1} of {totalPages}
-                    </span>
-                  );
-                })()}
+                    {/* Calculate total pages */}
+                    {(() => {
+                      const totalPages = Math.ceil(totalFlashcards / pageSize);
+                      return (
+                        <span className="text-sm">
+                          Page {page + 1} of {totalPages}
+                        </span>
+                      );
+                    })()}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(page + 1)}
-                  disabled={
-                    (page + 1) * pageSize >= totalFlashcards || isLoadingCards
-                  }
-                  className="cursor-pointer"
-                >
-                  Next <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page + 1)}
+                      disabled={
+                        (page + 1) * pageSize >= totalFlashcards ||
+                        isLoadingCards
+                      }
+                      className="cursor-pointer"
+                    >
+                      Next <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="bg-muted/30 p-6 rounded-lg max-w-md">
+                    <p className="text-muted-foreground mb-2 font-medium">
+                      No flashcards found
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedFolderId !== "all"
+                        ? "This folder doesn't contain any flashcards yet."
+                        : "You haven't created any flashcards yet."}
+                    </p>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

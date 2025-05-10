@@ -13,6 +13,7 @@ export type FlashcardResponse = {
   notes: string;
   user_id: string;
   created_at: string;
+  folder_id?: string;
 };
 
 export interface FlashcardData {

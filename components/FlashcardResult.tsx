@@ -53,6 +53,7 @@ import {
   CheckCircle,
   Copy,
   Edit,
+  Folder,
   Loader,
   Share,
   Trash2,
@@ -93,8 +94,14 @@ const posColors: Record<string, string> = {
 
 interface FlashcardResultProps extends FlashcardData {
   id?: string;
+  folderId?: string;
+  folderName?: string;
+  folders?: Array<{ id: string; name: string }>;
   onDelete?: (id: string) => Promise<void>;
-  onEdit?: (id: string, data: Partial<FlashcardData>) => Promise<void>;
+  onEdit?: (
+    id: string,
+    data: Partial<FlashcardData & { folder_id?: string }>
+  ) => Promise<void>;
 }
 
 // Create a validation schema using zod
@@ -123,6 +130,9 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
   pos,
   example,
   notes,
+  folderId,
+  folderName,
+  folders = [],
   onDelete,
   onEdit,
 }) => {
@@ -138,6 +148,7 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
     pos,
     example,
     notes,
+    folder_id: folderId || "none",
   });
 
   const [formErrors, setFormErrors] = useState<
@@ -248,7 +259,15 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
 
     setIsEditing(true);
     try {
-      await onEdit(id, editForm);
+      // Make a copy of editForm to modify for submission
+      const dataToSubmit = { ...editForm };
+
+      // Convert "none" to empty string for the API
+      if (dataToSubmit.folder_id === "none") {
+        dataToSubmit.folder_id = "";
+      }
+
+      await onEdit(id, dataToSubmit);
       toast.success("Flashcard updated successfully");
     } catch (err) {
       console.error("Edit error:", err);
@@ -265,22 +284,38 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
           <CardTitle className="text-lg sm:text-xl">
             Language Flashcard
           </CardTitle>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge
-                  className={`${
-                    posColors[pos] || "bg-gray-100 text-gray-800"
-                  } cursor-pointer text-xs sm:text-sm`}
-                >
-                  {posDescriptions[pos] || pos}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Part of Speech</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <div className="flex items-center gap-2">
+            {folderName && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="bg-blue-50 text-blue-600 cursor-pointer text-xs">
+                      <Folder className="h-3 w-3 mr-1" /> {folderName}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Folder</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    className={`${
+                      posColors[pos] || "bg-gray-100 text-gray-800"
+                    } cursor-pointer text-xs sm:text-sm`}
+                  >
+                    {posDescriptions[pos] || pos}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Part of Speech</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </CardHeader>
 
@@ -550,6 +585,34 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                           {formErrors.notes}
                         </p>
                       )}
+                    </div>
+                    {/* Add this field to the edit dialog form */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="folder">Folder</Label>
+                      <Select
+                        value={editForm.folder_id || "none"}
+                        onValueChange={(value) => {
+                          setEditForm((prev) => ({
+                            ...prev,
+                            folder_id: value === "none" ? "" : value,
+                          }));
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select folder" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No folder</SelectItem>
+                          {folders.map((folder) => (
+                            <SelectItem key={folder.id} value={folder.id}>
+                              {folder.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Organize your flashcard by assigning it to a folder
+                      </p>
                     </div>
                   </div>
                 </div>
