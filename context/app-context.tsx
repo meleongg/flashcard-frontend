@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
 import { Folder } from "@/types/folder";
+import { createContext, useContext, useState } from "react";
 
 type AppContextType = {
   // Language preferences
@@ -30,7 +30,7 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   // Initialize state, potentially from localStorage
   const [languageDirection, setLanguageDirection] = useState("auto-en");
-  const [selectedFolderId, setSelectedFolderId] = useState("all");
+  const [selectedFolderId, setSelectedFolderId] = useState("none");
   const [recentFolders, setRecentFolders] = useState<Folder[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [flashcardsVersion, setFlashcardsVersion] = useState(0);

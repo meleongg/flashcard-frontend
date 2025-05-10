@@ -1,7 +1,5 @@
 "use client";
 
-import { AuthButtons } from "@/components/AuthButtons";
-import { FlashcardResult } from "@/components/FlashcardResult";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,75 +17,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAppContext } from "@/context/app-context";
+import { apiUrl } from "@/lib/constants";
+import { getLanguageName, posDescriptions } from "@/lib/language-helpers";
 import { cn } from "@/lib/utils";
-import { FlashcardData, FlashcardResponse } from "@/types/flashcard";
-import { Folder as FlashcardFolder } from "@/types/folder";
-import {
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  Folder,
-  Lightbulb,
-  Loader,
-  Search,
-} from "lucide-react";
+import { FlashcardData } from "@/types/flashcard";
+import { BookOpen, Lightbulb, Loader, Search } from "lucide-react";
 import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
+import Link from "next/link";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { apiUrl } from "@/lib/constants";
-
-const posDescriptions: Record<string, string> = {
-  NOUN: "Noun",
-  VERB: "Verb",
-  ADJ: "Adjective",
-  ADV: "Adverb",
-  PRON: "Pronoun",
-  PREP: "Preposition",
-  CONJ: "Conjunction",
-  INTJ: "Interjection",
-  DET: "Determiner",
-};
-
-const getLanguageName = (code: string): string => {
-  const languages: Record<string, string> = {
-    en: "English",
-    zh: "Mandarin",
-    es: "Spanish",
-    fr: "French",
-    ja: "Japanese",
-    de: "German",
-    ru: "Russian",
-    it: "Italian",
-    pt: "Portuguese",
-    ko: "Korean",
-  };
-
-  return languages[code] || code;
-};
 
 export function DashboardClient({ session }: { session: Session }) {
+  // Get shared state from context
+  const {
+    languageDirection,
+    setLanguageDirection,
+    selectedFolderId,
+    setSelectedFolderId,
+    refreshFlashcards,
+  } = useAppContext();
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const [result, setResult] = useState<null | FlashcardResponse>(null);
-  const [allFlashcards, setAllFlashcards] = useState<FlashcardResponse[]>([]);
-  const [page, setPage] = useState(0);
-  const pageSize = 5;
-  const [isLoadingCards, setIsLoadingCards] = useState(false);
-  const [totalFlashcards, setTotalFlashcards] = useState(0);
-  const resultRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [folders, setFolders] = useState<FlashcardFolder[]>([]);
-  const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
   const [previewFlashcard, setPreviewFlashcard] =
     useState<FlashcardData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [languageDirection, setLanguageDirection] = useState<string>("auto-en");
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>(
+    []
+  );
+  const [foldersLoading, setFoldersLoading] = useState(false);
+
   const MAX_WORD_LENGTH = 50;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Fetch folders for the dropdown
+  useEffect(() => {
+    fetchFolders();
+  }, [session]);
 
   const fetchFolders = async () => {
+    setFoldersLoading(true);
+
     try {
       const session = await getSession();
       const token = session?.accessToken;
@@ -104,68 +79,19 @@ export function DashboardClient({ session }: { session: Session }) {
       setFolders(data);
     } catch (err) {
       console.error("Error fetching folders:", err);
-      // Don't show error toast for folders as it's not critical
-    }
-  };
-
-  const fetchFlashcards = async (currentPage = 0) => {
-    setIsLoadingCards(true);
-
-    try {
-      const session = await getSession();
-      const token = session?.accessToken;
-
-      // Use URL constructor for more robust parameter handling
-      const url = new URL(`${apiUrl}/flashcards`);
-
-      // Add query parameters
-      url.searchParams.append("skip", (currentPage * pageSize).toString());
-      url.searchParams.append("limit", pageSize.toString());
-
-      // Only add folder_id if it's not "all"
-      if (selectedFolderId !== "all") {
-        url.searchParams.append("folder_id", selectedFolderId);
-      }
-
-      console.log(`Fetching flashcards from: ${url.toString()}`);
-
-      const res = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) throw new Error(`Failed to fetch flashcards: ${res.status}`);
-
-      const data = await res.json();
-
-      setAllFlashcards(data.flashcards);
-      setTotalFlashcards(data.total);
-    } catch (err) {
-      console.error("Error fetching flashcards:", err);
-      toast.error("Failed to load flashcards");
     } finally {
-      setIsLoadingCards(false);
+      setFoldersLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchFolders();
-  }, [session]);
-
-  useEffect(() => {
-    fetchFlashcards(page);
-  }, [page, selectedFolderId]);
-
-  const handleSubmit = async () => {
-    // Reset error states
-    setInputError(null);
+  // Generate preview without saving
+  const handleGenerate = async () => {
+    // Reset error state
     setError(null);
 
-    // Validation
+    // Input validation
     if (!text.trim()) {
       setInputError("Please enter a word or phrase");
-      toast.error("Please enter a word or phrase");
       return;
     }
 
@@ -175,120 +101,16 @@ export function DashboardClient({ session }: { session: Session }) {
       return;
     }
 
-    // Input is valid, proceed with API call
-    setIsLoading(true);
-
-    try {
-      const session = await getSession();
-      const token = session?.accessToken;
-
-      // Only include folder_id in the payload if it's not "all"
-      const payload: { word: string; folder_id?: string } = { word: text };
-
-      if (selectedFolderId !== "all") {
-        payload.folder_id = selectedFolderId;
-      }
-
-      console.log("Creating flashcard with payload:", payload);
-
-      const res = await fetch(`${apiUrl}/flashcard`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-      const data = await res.json();
-      setResult(data);
-
-      await fetchFlashcards();
-      toast.success("Flashcard generated successfully");
-    } catch (err: any) {
-      setError("Something went wrong. Please try again.");
-      toast.error("Failed to generate flashcard");
-      console.error("Fetch error:", err);
-    } finally {
-      setIsLoading(false);
-      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
-
-  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !isLoading) handleSubmit();
-  };
-
-  const deleteFlashcard = async (flashcardId: string) => {
-    try {
-      const session = await getSession();
-      const token = session?.accessToken;
-
-      const res = await fetch(`${apiUrl}/flashcard/${flashcardId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`);
-      }
-
-      // Refresh the flashcards list
-      await fetchFlashcards(page);
-      toast.success("Flashcard deleted successfully");
-    } catch (error) {
-      console.error("Delete error:", error);
-      toast.error("Failed to delete flashcard");
-      throw error;
-    }
-  };
-
-  const editFlashcard = async (
-    flashcardId: string,
-    data: Partial<FlashcardData & { folder_id?: string }>
-  ) => {
-    const session = await getSession();
-    const token = session?.accessToken;
-
-    try {
-      const res = await fetch(`${apiUrl}/flashcard/${flashcardId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`);
-      }
-
-      // Refresh the flashcards list to show the updated content
-      await fetchFlashcards(page);
-      toast.success("Flashcard updated successfully");
-    } catch (error) {
-      console.error("Edit error:", error);
-      toast.error("Failed to update flashcard");
-      throw error;
-    }
-  };
-
-  // Generate preview without saving
-  const handleGenerate = async () => {
-    // Input validation
-    if (!text.trim()) {
-      setInputError("Please enter a word or phrase");
-      return;
-    }
-
     setIsLoading(true);
     try {
       const session = await getSession();
       const token = session?.accessToken;
+
+      if (!token) {
+        setError("Authentication error. Please try logging in again.");
+        toast.error("Authentication error");
+        return;
+      }
 
       // Parse the language direction into source and target
       const [sourceLanguage, targetLanguage] = languageDirection.split("-");
@@ -306,18 +128,32 @@ export function DashboardClient({ session }: { session: Session }) {
         }),
       });
 
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || `Server responded with ${res.status}`;
+        throw new Error(errorMessage);
+      }
+
       const data = await res.json();
 
       // Set as preview (doesn't save to backend yet)
       setPreviewFlashcard(data);
-      setIsEditing(false); // Start in view mode, not edit mode
-    } catch (err) {
-      console.error(err);
+      setIsEditing(false);
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err: any) {
+      console.error("Generate error:", err);
+      setError(
+        err.message || "Failed to generate flashcard. Please try again."
+      );
       toast.error("Failed to generate flashcard");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !isLoading) handleGenerate();
   };
 
   // Update preview state when editing
@@ -338,7 +174,10 @@ export function DashboardClient({ session }: { session: Session }) {
 
       const payload = {
         ...previewFlashcard,
-        folder_id: selectedFolderId === "none" ? "" : selectedFolderId,
+        folder_id:
+          selectedFolderId === "none" || selectedFolderId === "all"
+            ? ""
+            : selectedFolderId,
         source_lang:
           sourceLanguage === "auto"
             ? previewFlashcard.source_lang
@@ -357,8 +196,8 @@ export function DashboardClient({ session }: { session: Session }) {
 
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);
 
-      // Success - update the flashcard list
-      await fetchFlashcards(page);
+      // Signal other components to refresh their flashcard lists
+      refreshFlashcards();
       toast.success("Flashcard saved successfully");
 
       // Reset the form
@@ -378,11 +217,7 @@ export function DashboardClient({ session }: { session: Session }) {
   };
 
   return (
-    <main className="p-6 max-w-2xl mx-auto space-y-6">
-      <div className="flex justify-end">
-        <AuthButtons />
-      </div>
-
+    <div className="max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl flex items-center gap-2">
@@ -423,19 +258,12 @@ export function DashboardClient({ session }: { session: Session }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="auto-zh">Auto → Mandarin</SelectItem>
+                  <SelectItem value="auto-zh">Auto → French</SelectItem>
                   <SelectItem value="auto-en">Auto → English</SelectItem>
-                  <SelectItem value="auto-es">Auto → Spanish</SelectItem>
-                  <SelectItem value="auto-fr">Auto → French</SelectItem>
-                  <SelectItem value="auto-ja">Auto → Japanese</SelectItem>
-
                   <SelectItem value="en-zh">English → Mandarin</SelectItem>
                   <SelectItem value="zh-en">Mandarin → English</SelectItem>
-                  <SelectItem value="en-es">English → Spanish</SelectItem>
-                  <SelectItem value="es-en">Spanish → English</SelectItem>
                   <SelectItem value="en-fr">English → French</SelectItem>
                   <SelectItem value="fr-en">French → English</SelectItem>
-                  <SelectItem value="en-ja">English → Japanese</SelectItem>
-                  <SelectItem value="ja-en">Japanese → English</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -459,67 +287,12 @@ export function DashboardClient({ session }: { session: Session }) {
         </CardContent>
       </Card>
 
-      {/* Preview Card */}
-      {previewFlashcard && (
-        <Card className="border-2 border-primary/20">
-          {/* Language direction in preview card */}
-          <CardHeader className="bg-primary/5 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-xl">Preview Flashcard</CardTitle>
-              {isEditing ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <Select
-                    value={
-                      languageDirection.startsWith("auto") &&
-                      previewFlashcard.source_lang
-                        ? previewFlashcard.source_lang
-                        : languageDirection.split("-")[0]
-                    }
-                    onValueChange={(val) => {
-                      // Keep target language, change source language
-                      const targetLang = languageDirection.split("-")[1];
-                      setLanguageDirection(`${val}-${targetLang}`);
-                      updatePreview("source_lang", val);
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="zh">Mandarin</SelectItem>
-                      <SelectItem value="es">Spanish</SelectItem>
-                      <SelectItem value="fr">French</SelectItem>
-                      <SelectItem value="ja">Japanese</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <span className="text-sm">→</span>
-                  <Select
-                    value={languageDirection.split("-")[1]}
-                    onValueChange={(val) => {
-                      // Keep source language, change target language
-                      const sourceLang =
-                        languageDirection.startsWith("auto") &&
-                        previewFlashcard.source_lang
-                          ? previewFlashcard.source_lang
-                          : languageDirection.split("-")[0];
-                      setLanguageDirection(`${sourceLang}-${val}`);
-                      updatePreview("target_lang", val);
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="zh">Mandarin</SelectItem>
-                      <SelectItem value="es">Spanish</SelectItem>
-                      <SelectItem value="fr">French</SelectItem>
-                      <SelectItem value="ja">Japanese</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
+      <div ref={resultRef}>
+        {previewFlashcard && (
+          <Card className="border-2 border-primary/20">
+            <CardHeader className="bg-primary/5 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xl">Preview Flashcard</CardTitle>
                 <CardDescription>
                   {languageDirection.startsWith("auto")
                     ? `${
@@ -531,187 +304,190 @@ export function DashboardClient({ session }: { session: Session }) {
                         languageDirection.split("-")[0]
                       )} → ${getLanguageName(languageDirection.split("-")[1])}`}
                 </CardDescription>
-              )}
-            </div>
+              </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleDiscard}>
-                Discard
-              </Button>
-              <Button size="sm" onClick={handleSave}>
-                Save Flashcard
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid gap-6">
-              {/* Word */}
-              <div className="grid gap-2">
-                <div className="flex justify-between">
-                  <Label htmlFor="word">Word</Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => setIsEditing(!isEditing)}
-                  >
-                    {isEditing ? "Done" : "Edit"}
-                  </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleDiscard}>
+                  Discard
+                </Button>
+                <Button size="sm" onClick={handleSave}>
+                  Save Flashcard
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid gap-6">
+                {/* Word */}
+                <div className="grid gap-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor="word">Word</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setIsEditing(!isEditing)}
+                    >
+                      {isEditing ? "Done" : "Edit"}
+                    </Button>
+                  </div>
+                  {isEditing ? (
+                    <Input
+                      id="word"
+                      value={previewFlashcard.word}
+                      onChange={(e) => updatePreview("word", e.target.value)}
+                    />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      {previewFlashcard.word}
+                    </div>
+                  )}
                 </div>
-                {isEditing ? (
-                  <Input
-                    id="word"
-                    value={previewFlashcard.word}
-                    onChange={(e) => updatePreview("word", e.target.value)}
-                  />
-                ) : (
-                  <div className="text-2xl font-bold">
-                    {previewFlashcard.word}
-                  </div>
-                )}
-              </div>
 
-              {/* Translation */}
-              <div className="grid gap-2">
-                <Label htmlFor="translation">Translation</Label>
-                {isEditing ? (
-                  <Input
-                    id="translation"
-                    value={previewFlashcard.translation}
-                    onChange={(e) =>
-                      updatePreview("translation", e.target.value)
-                    }
-                  />
-                ) : (
-                  <div className="text-lg">{previewFlashcard.translation}</div>
-                )}
-              </div>
+                {/* Translation */}
+                <div className="grid gap-2">
+                  <Label htmlFor="translation">Translation</Label>
+                  {isEditing ? (
+                    <Input
+                      id="translation"
+                      value={previewFlashcard.translation}
+                      onChange={(e) =>
+                        updatePreview("translation", e.target.value)
+                      }
+                    />
+                  ) : (
+                    <div className="text-lg">
+                      {previewFlashcard.translation}
+                    </div>
+                  )}
+                </div>
 
-              {/* Phonetic pronunciation */}
-              <div className="grid gap-2">
-                <Label htmlFor="phonetic">Pronunciation</Label>
-                {isEditing ? (
-                  <Input
-                    id="phonetic"
-                    value={previewFlashcard.phonetic}
-                    onChange={(e) => updatePreview("phonetic", e.target.value)}
-                    placeholder="Phonetic pronunciation"
-                  />
-                ) : (
-                  <div className="text-base font-mono">
-                    {previewFlashcard.phonetic || "—"}
-                  </div>
-                )}
-              </div>
+                {/* Phonetic pronunciation */}
+                <div className="grid gap-2">
+                  <Label htmlFor="phonetic">Pronunciation</Label>
+                  {isEditing ? (
+                    <Input
+                      id="phonetic"
+                      value={previewFlashcard.phonetic}
+                      onChange={(e) =>
+                        updatePreview("phonetic", e.target.value)
+                      }
+                      placeholder="Phonetic pronunciation"
+                    />
+                  ) : (
+                    <div className="text-base font-mono">
+                      {previewFlashcard.phonetic || "—"}
+                    </div>
+                  )}
+                </div>
 
-              {/* Part of speech */}
-              <div className="grid gap-2">
-                <Label htmlFor="pos">Part of Speech</Label>
-                {isEditing ? (
+                {/* Part of speech */}
+                <div className="grid gap-2">
+                  <Label htmlFor="pos">Part of Speech</Label>
+                  {isEditing ? (
+                    <Select
+                      value={previewFlashcard.pos}
+                      onValueChange={(val) => updatePreview("pos", val)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NOUN">Noun</SelectItem>
+                        <SelectItem value="VERB">Verb</SelectItem>
+                        <SelectItem value="ADJ">Adjective</SelectItem>
+                        <SelectItem value="ADV">Adverb</SelectItem>
+                        <SelectItem value="PRON">Pronoun</SelectItem>
+                        <SelectItem value="PREP">Preposition</SelectItem>
+                        <SelectItem value="CONJ">Conjunction</SelectItem>
+                        <SelectItem value="INTJ">Interjection</SelectItem>
+                        <SelectItem value="DET">Determiner</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="text-base">
+                      {posDescriptions[previewFlashcard.pos] ||
+                        previewFlashcard.pos}
+                    </div>
+                  )}
+                </div>
+
+                {/* Example sentence */}
+                <div className="grid gap-2">
+                  <Label htmlFor="example">Example</Label>
+                  {isEditing ? (
+                    <textarea
+                      id="example"
+                      value={previewFlashcard.example}
+                      onChange={(e) => updatePreview("example", e.target.value)}
+                      className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      placeholder="Example sentence using this word"
+                    ></textarea>
+                  ) : (
+                    <div className="text-base italic">
+                      "{previewFlashcard.example || "—"}"
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="grid gap-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  {isEditing ? (
+                    <textarea
+                      id="notes"
+                      value={previewFlashcard.notes}
+                      onChange={(e) => updatePreview("notes", e.target.value)}
+                      className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      placeholder="Any additional notes about the word"
+                    ></textarea>
+                  ) : (
+                    <div className="text-base">
+                      {previewFlashcard.notes || "—"}
+                    </div>
+                  )}
+                </div>
+
+                {/* Folder selection */}
+                <div className="grid gap-2">
+                  <Label>Folder</Label>
                   <Select
-                    value={previewFlashcard.pos}
-                    onValueChange={(val) => updatePreview("pos", val)}
+                    value={selectedFolderId}
+                    onValueChange={(val) => {
+                      setSelectedFolderId(val);
+                    }}
+                    disabled={isLoading}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue
+                        placeholder={
+                          foldersLoading
+                            ? "Loading folders..."
+                            : "Add to folder"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="NOUN">Noun</SelectItem>
-                      <SelectItem value="VERB">Verb</SelectItem>
-                      <SelectItem value="ADJ">Adjective</SelectItem>
-                      <SelectItem value="ADV">Adverb</SelectItem>
-                      <SelectItem value="PRON">Pronoun</SelectItem>
-                      <SelectItem value="PREP">Preposition</SelectItem>
-                      <SelectItem value="CONJ">Conjunction</SelectItem>
-                      <SelectItem value="INTJ">Interjection</SelectItem>
-                      <SelectItem value="DET">Determiner</SelectItem>
+                      <SelectItem value="none">No folder</SelectItem>
+                      {folders.length === 0 && !foldersLoading ? (
+                        <SelectItem value="no-folders" disabled>
+                          No folders available
+                        </SelectItem>
+                      ) : (
+                        folders.map((folder) => (
+                          <SelectItem key={folder.id} value={folder.id}>
+                            {folder.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
-                ) : (
-                  <div className="text-base">
-                    {posDescriptions[previewFlashcard.pos] ||
-                      previewFlashcard.pos}
-                  </div>
-                )}
+                </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
 
-              {/* Example sentence */}
-              <div className="grid gap-2">
-                <Label htmlFor="example">Example</Label>
-                {isEditing ? (
-                  <textarea
-                    id="example"
-                    value={previewFlashcard.example}
-                    onChange={(e) => updatePreview("example", e.target.value)}
-                    className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    placeholder="Example sentence using this word"
-                  ></textarea>
-                ) : (
-                  <div className="text-base italic">
-                    "{previewFlashcard.example || "—"}"
-                  </div>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Notes</Label>
-                {isEditing ? (
-                  <textarea
-                    id="notes"
-                    value={previewFlashcard.notes}
-                    onChange={(e) => updatePreview("notes", e.target.value)}
-                    className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    placeholder="Any additional notes about the word"
-                  ></textarea>
-                ) : (
-                  <div className="text-base">
-                    {previewFlashcard.notes || "—"}
-                  </div>
-                )}
-              </div>
-
-              {/* Folder selection */}
-              <div className="grid gap-2">
-                <Label>Folder</Label>
-                <Select
-                  value={selectedFolderId}
-                  onValueChange={(val) => setSelectedFolderId(val)}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Add to folder" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No folder</SelectItem>
-                    {folders.map((folder) => (
-                      <SelectItem key={folder.id} value={folder.id}>
-                        {folder.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!result && !isLoading && !error && (
-        <div className="flex items-center justify-center p-8 border border-dashed rounded-lg bg-muted/50">
-          <div className="flex flex-col items-center text-center text-muted-foreground gap-2">
-            <Lightbulb className="h-10 w-10 opacity-50" />
-            <h3 className="font-medium">Enter a word above to get started</h3>
-            <p className="text-sm max-w-md">
-              Our AI will analyze the word and generate a comprehensive
-              flashcard with translation, pronunciation, examples, and usage
-              notes.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div ref={resultRef}>
+        {/* Loading state */}
         {isLoading && (
           <Card className="p-8">
             <div className="flex flex-col items-center gap-3 text-center">
@@ -722,6 +498,8 @@ export function DashboardClient({ session }: { session: Session }) {
             </div>
           </Card>
         )}
+
+        {/* Error state */}
         {error && (
           <Card className="border-red-200 bg-red-50 p-4">
             <p className="text-red-500 text-center">{error}</p>
@@ -730,151 +508,31 @@ export function DashboardClient({ session }: { session: Session }) {
             </p>
           </Card>
         )}
-        {result && (
-          <FlashcardResult
-            word={result.word}
-            translation={result.translation}
-            phonetic={result.phonetic}
-            pos={result.pos}
-            example={result.example}
-            notes={result.notes}
-            sourceLang={result.source_lang}
-            targetLang={result.target_lang}
-            folderId={selectedFolderId}
-          />
+
+        {/* Empty state */}
+        {!previewFlashcard && !isLoading && !error && (
+          <div className="flex items-center justify-center p-8 border border-dashed rounded-lg bg-muted/50">
+            <div className="flex flex-col items-center text-center text-muted-foreground gap-2">
+              <Lightbulb className="h-10 w-10 opacity-50" />
+              <h3 className="font-medium">Enter a word above to get started</h3>
+              <p className="text-sm max-w-md">
+                Our AI will analyze the word and generate a comprehensive
+                flashcard with translation, pronunciation, examples, and usage
+                notes.
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
-      {allFlashcards.length > 0 && (
-        <div className="space-y-4 mt-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold">Your Saved Flashcards</h2>
-
-            {/* Add folder selector */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <Folder className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Viewing:</span>
-              </div>
-              <Select
-                value={selectedFolderId}
-                onValueChange={(value) => {
-                  console.log(`Changing folder to: ${value}`); // Debug log
-                  setSelectedFolderId(value);
-                  setPage(0); // Reset to first page when changing folders
-                }}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select folder">
-                    {selectedFolderId === "all"
-                      ? "All Flashcards"
-                      : folders.find((f) => f.id === selectedFolderId)?.name ||
-                        "Select folder"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Flashcards</SelectItem>
-                  {folders.map((folder) => (
-                    <SelectItem key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <p className="text-sm text-muted-foreground sm:ml-auto">
-              Showing {page * pageSize + 1}-
-              {Math.min((page + 1) * pageSize, totalFlashcards)} of{" "}
-              {totalFlashcards}
-            </p>
-          </div>
-
-          {isLoadingCards ? (
-            <div className="flex justify-center py-8">
-              <Loader className="animate-spin h-8 w-8 text-primary" />
-            </div>
-          ) : (
-            <>
-              {allFlashcards.length > 0 ? (
-                <>
-                  {allFlashcards.map((fc) => (
-                    <FlashcardResult
-                      key={fc.id}
-                      id={fc.id}
-                      word={fc.word}
-                      translation={fc.translation}
-                      phonetic={fc.phonetic}
-                      pos={fc.pos}
-                      example={fc.example}
-                      notes={fc.notes}
-                      sourceLang={fc.source_lang}
-                      targetLang={fc.target_lang}
-                      folderId={fc.folder_id}
-                      folderName={
-                        folders.find((f) => f.id === fc.folder_id)?.name
-                      }
-                      folders={folders}
-                      onDelete={deleteFlashcard}
-                      onEdit={editFlashcard}
-                    />
-                  ))}
-
-                  <div className="flex justify-center items-center gap-4 pt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(Math.max(0, page - 1))}
-                      disabled={page === 0 || isLoadingCards}
-                      className="cursor-pointer"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                    </Button>
-
-                    {/* Calculate total pages */}
-                    {(() => {
-                      const totalPages = Math.ceil(totalFlashcards / pageSize);
-                      return (
-                        <span className="text-sm">
-                          Page {page + 1} of {totalPages}
-                        </span>
-                      );
-                    })()}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(page + 1)}
-                      disabled={
-                        (page + 1) * pageSize >= totalFlashcards ||
-                        isLoadingCards
-                      }
-                      className="cursor-pointer"
-                    >
-                      Next <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="bg-muted/30 p-6 rounded-lg max-w-md">
-                    <p className="text-muted-foreground mb-2 font-medium">
-                      No flashcards found
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedFolderId !== "all"
-                        ? "This folder doesn't contain any flashcards yet."
-                        : "You haven't created any flashcards yet."}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {/* Link to view all flashcards */}
+      <div className="flex justify-center">
+        <Link href="/flashcards">
+          <Button variant="outline">View All Flashcards</Button>
+        </Link>
+      </div>
 
       <Toaster position="bottom-right" />
-    </main>
+    </div>
   );
 }
