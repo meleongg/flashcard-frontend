@@ -53,7 +53,16 @@ import {
 } from "@/lib/language-helpers";
 import { cn } from "@/lib/utils";
 import { FlashcardData } from "@/types/flashcard";
-import { Copy, Edit, Folder, Loader, Trash2, Volume2 } from "lucide-react";
+import {
+  Copy,
+  Edit,
+  ExternalLink,
+  Folder,
+  Loader,
+  Trash2,
+  Volume2,
+} from "lucide-react";
+import Link from "next/link";
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -612,6 +621,17 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
         {/* In grid view, show fewer buttons */}
         {viewMode === "grid" ? (
           <div className="flex justify-between w-full">
+            {id && (
+              <Link href={`/flashcards/${id}`}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="p-1 h-8 cursor-pointer text-xs"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -899,6 +919,18 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
         ) : (
           // Original footer for list view
           <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start">
+            {id && (
+              <Link href={`/flashcards/${id}`}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer text-primary text-xs"
+                >
+                  <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> View
+                  Details
+                </Button>
+              </Link>
+            )}
             <Button
               size="sm"
               variant="outline"

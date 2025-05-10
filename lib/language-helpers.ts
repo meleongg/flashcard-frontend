@@ -27,7 +27,9 @@ export const posColors: Record<string, string> = {
   PROPN: "bg-indigo-100 text-indigo-800",
 };
 
-export const getLanguageName = (code: string): string => {
+export const getLanguageName = (code: string | undefined): string => {
+  if (!code) return "Unknown";
+
   const languages: Record<string, string> = {
     en: "English",
     zh: "Mandarin",

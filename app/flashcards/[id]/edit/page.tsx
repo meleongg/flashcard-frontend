@@ -1,8 +1,8 @@
 import { getAuthSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { FlashcardDetailClient } from "./flashcard-detail-client";
+import { EditFlashcardClient } from "./edit-client";
 
-export default async function FlashcardDetailPage({
+export default async function EditFlashcardPage({
   params,
 }: {
   params: { id: string };
@@ -13,5 +13,5 @@ export default async function FlashcardDetailPage({
     redirect("/login");
   }
 
-  return <FlashcardDetailClient id={params.id} session={session} />;
+  return <EditFlashcardClient id={params.id} session={session} />;
 }
