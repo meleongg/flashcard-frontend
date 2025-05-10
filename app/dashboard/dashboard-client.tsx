@@ -35,8 +35,7 @@ import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+import { apiUrl } from "@/lib/constants";
 
 const posDescriptions: Record<string, string> = {
   NOUN: "Noun",
