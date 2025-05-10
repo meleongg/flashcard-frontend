@@ -11,12 +11,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { FlashcardData, FlashcardResponse } from "@/types/flashcard";
+import { Folder as FlashcardFolder } from "@/types/folder";
 import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  Folder,
   Lightbulb,
   Loader,
   Search,
@@ -48,7 +57,30 @@ export function DashboardClient({ session }: { session: Session }) {
   const resultRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [folders, setFolders] = useState<FlashcardFolder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
   const MAX_WORD_LENGTH = 50;
+
+  const fetchFolders = async () => {
+    try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
+      const res = await fetch(`${apiUrl}/folders`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch folders");
+
+      const data = await res.json();
+      setFolders(data);
+    } catch (err) {
+      console.error("Error fetching folders:", err);
+      // Don't show error toast for folders as it's not critical
+    }
+  };
 
   const fetchFlashcards = async (currentPage = 0) => {
     setIsLoadingCards(true);
@@ -57,12 +89,21 @@ export function DashboardClient({ session }: { session: Session }) {
       const session = await getSession();
       const token = session?.accessToken;
 
+      // Check if selectedFolderId exists and isn't "all"
+      const folderParam =
+        selectedFolderId && selectedFolderId !== "all"
+          ? `&folder_id=${selectedFolderId}`
+          : "";
+
       const res = await fetch(
-        `${apiUrl}/flashcards?skip=${currentPage * pageSize}&limit=${pageSize}`,
+        `${apiUrl}/flashcards?skip=${
+          currentPage * pageSize
+        }&limit=${pageSize}${folderParam}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+
       if (!res.ok) throw new Error("Failed to fetch flashcards");
 
       const data = await res.json();
@@ -77,6 +118,7 @@ export function DashboardClient({ session }: { session: Session }) {
   };
 
   useEffect(() => {
+    fetchFolders();
     fetchFlashcards(page);
   }, [session, page]);
 
@@ -113,6 +155,7 @@ export function DashboardClient({ session }: { session: Session }) {
         },
         body: JSON.stringify({
           word: text,
+          folder_id: selectedFolderId,
         }),
       });
 
@@ -304,10 +347,37 @@ export function DashboardClient({ session }: { session: Session }) {
 
       {allFlashcards.length > 0 && (
         <div className="space-y-4 mt-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">Your Saved Flashcards</h2>
-            <p className="text-sm text-muted-foreground">
-              {/* Calculate the range of flashcards being shown */}
+
+            {/* Add folder selector */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Folder className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Viewing:</span>
+              </div>
+              <Select
+                value={selectedFolderId}
+                onValueChange={(value) => {
+                  setSelectedFolderId(value);
+                  setPage(0); // Reset to first page when changing folders
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Flashcards</SelectItem>
+                  {folders.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="text-sm text-muted-foreground sm:ml-auto">
               Showing {page * pageSize + 1}-
               {Math.min((page + 1) * pageSize, totalFlashcards)} of{" "}
               {totalFlashcards}
