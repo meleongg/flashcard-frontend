@@ -38,18 +38,29 @@ import { Toaster, toast } from "sonner";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
+// Add this helper function to get full language names
+const getLanguageName = (code: string): string => {
+  const languages: Record<string, string> = {
+    en: "English",
+    zh: "Mandarin",
+    es: "Spanish",
+    fr: "French",
+    ja: "Japanese",
+    de: "German",
+    ru: "Russian",
+    it: "Italian",
+    pt: "Portuguese",
+    ko: "Korean",
+  };
+
+  return languages[code] || code;
+};
+
 export function DashboardClient({ session }: { session: Session }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const [result, setResult] = useState<null | {
-    word: string;
-    translation: string;
-    phonetic: string;
-    pos: string;
-    example: string;
-    notes: string;
-  }>(null);
+  const [result, setResult] = useState<null | FlashcardResponse>(null);
   const [allFlashcards, setAllFlashcards] = useState<FlashcardResponse[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 5;
@@ -63,6 +74,7 @@ export function DashboardClient({ session }: { session: Session }) {
   const [previewFlashcard, setPreviewFlashcard] =
     useState<FlashcardData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [languageDirection, setLanguageDirection] = useState<string>("en-zh");
   const MAX_WORD_LENGTH = 50;
 
   const fetchFolders = async () => {
@@ -269,13 +281,20 @@ export function DashboardClient({ session }: { session: Session }) {
       const session = await getSession();
       const token = session?.accessToken;
 
+      // Parse the language direction into source and target
+      const [sourceLanguage, targetLanguage] = languageDirection.split("-");
+
       const res = await fetch(`${apiUrl}/flashcard-preview`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ word: text }),
+        body: JSON.stringify({
+          word: text,
+          source_lang: sourceLanguage,
+          target_lang: targetLanguage,
+        }),
       });
 
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);
@@ -305,9 +324,14 @@ export function DashboardClient({ session }: { session: Session }) {
       const session = await getSession();
       const token = session?.accessToken;
 
+      // Parse the language direction
+      const [sourceLanguage, targetLanguage] = languageDirection.split("-");
+
       const payload = {
         ...previewFlashcard,
         folder_id: selectedFolderId === "none" ? "" : selectedFolderId,
+        source_lang: sourceLanguage,
+        target_lang: targetLanguage,
       };
 
       const res = await fetch(`${apiUrl}/flashcard`, {
@@ -377,17 +401,23 @@ export function DashboardClient({ session }: { session: Session }) {
                 maxLength={MAX_WORD_LENGTH}
               />
 
-              {/* Source language selector */}
-              <Select defaultValue="auto" disabled={isLoading}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Language" />
+              <Select
+                value={languageDirection}
+                onValueChange={(val) => setLanguageDirection(val)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Translate" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto-detect</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Spanish</SelectItem>
-                  <SelectItem value="zh">Mandarin</SelectItem>
-                  {/* Add more languages */}
+                  <SelectItem value="en-zh">English → Mandarin</SelectItem>
+                  <SelectItem value="zh-en">Mandarin → English</SelectItem>
+                  <SelectItem value="en-es">English → Spanish</SelectItem>
+                  <SelectItem value="es-en">Spanish → English</SelectItem>
+                  <SelectItem value="en-fr">English → French</SelectItem>
+                  <SelectItem value="fr-en">French → English</SelectItem>
+                  <SelectItem value="en-ja">English → Japanese</SelectItem>
+                  <SelectItem value="ja-en">Japanese → English</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -415,7 +445,13 @@ export function DashboardClient({ session }: { session: Session }) {
       {previewFlashcard && (
         <Card className="border-2 border-primary/20">
           <CardHeader className="bg-primary/5 flex flex-row items-center justify-between">
-            <CardTitle className="text-xl">Preview Flashcard</CardTitle>
+            <div>
+              <CardTitle className="text-xl">Preview Flashcard</CardTitle>
+              <CardDescription>
+                {getLanguageName(languageDirection.split("-")[0])} →{" "}
+                {getLanguageName(languageDirection.split("-")[1])}
+              </CardDescription>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleDiscard}>
                 Discard
@@ -538,6 +574,9 @@ export function DashboardClient({ session }: { session: Session }) {
             pos={result.pos}
             example={result.example}
             notes={result.notes}
+            sourceLang={result.source_lang}
+            targetLang={result.target_lang}
+            folderId={selectedFolderId}
           />
         )}
       </div>
@@ -605,6 +644,8 @@ export function DashboardClient({ session }: { session: Session }) {
                       pos={fc.pos}
                       example={fc.example}
                       notes={fc.notes}
+                      sourceLang={fc.source_lang}
+                      targetLang={fc.target_lang}
                       folderId={fc.folder_id}
                       folderName={
                         folders.find((f) => f.id === fc.folder_id)?.name

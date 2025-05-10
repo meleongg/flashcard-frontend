@@ -51,7 +51,7 @@ import { FlashcardData } from "@/types/flashcard";
 import { Copy, Edit, Folder, Loader, Trash2, Volume2 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
-import { z } from "zod"; // You'll need to install zod: npm install zod
+import { z } from "zod";
 
 // Map of POS tags to more readable descriptions
 const posDescriptions: Record<string, string> = {
@@ -82,11 +82,30 @@ const posColors: Record<string, string> = {
   PROPN: "bg-indigo-100 text-indigo-800",
 };
 
+const getLanguageName = (code: string): string => {
+  const languages: Record<string, string> = {
+    en: "English",
+    zh: "Mandarin",
+    es: "Spanish",
+    fr: "French",
+    ja: "Japanese",
+    de: "German",
+    ru: "Russian",
+    it: "Italian",
+    pt: "Portuguese",
+    ko: "Korean",
+  };
+
+  return languages[code] || code;
+};
+
 interface FlashcardResultProps extends FlashcardData {
   id?: string;
   folderId?: string;
   folderName?: string;
   folders?: Array<{ id: string; name: string }>;
+  sourceLang?: string;
+  targetLang?: string;
   onDelete?: (id: string) => Promise<void>;
   onEdit?: (
     id: string,
@@ -123,10 +142,11 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
   folderId,
   folderName,
   folders = [],
+  sourceLang,
+  targetLang,
   onDelete,
   onEdit,
 }) => {
-  const [saved, setSaved] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -139,6 +159,8 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
     example,
     notes,
     folder_id: folderId || "none",
+    source_lang: sourceLang || "",
+    target_lang: targetLang || "",
   });
 
   const [formErrors, setFormErrors] = useState<
@@ -264,6 +286,11 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg sm:text-xl">
             Language Flashcard
+            {sourceLang && targetLang && (
+              <span className="text-xs font-normal text-muted-foreground ml-2">
+                {getLanguageName(sourceLang)} → {getLanguageName(targetLang)}
+              </span>
+            )}
           </CardTitle>
           <div className="flex items-center gap-2">
             {folderName && (
@@ -356,18 +383,45 @@ export const FlashcardResult: React.FC<FlashcardResultProps> = ({
                 Notes
               </h3>
               <div className="p-3 bg-muted rounded-md">
-                <p className="text-base">{notes}</p>
+                <p className="text-base">{notes || "No notes added"}</p>
               </div>
             </div>
 
-            <div>
+            <div className="space-y-2">
               <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                Additional Information
+                Flashcard Details
               </h3>
-              <p className="text-sm text-muted-foreground">
-                Create your own flashcards by entering different words or
-                phrases above.
-              </p>
+
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {/* Language Direction */}
+                {sourceLang && targetLang && (
+                  <div className="col-span-2 flex items-center gap-2 p-2 bg-muted/50 rounded">
+                    <span className="font-medium">Languages:</span>
+                    <span>
+                      {getLanguageName(sourceLang)} →{" "}
+                      {getLanguageName(targetLang)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Part of Speech with description */}
+                <div className="flex flex-col p-2 bg-muted/50 rounded">
+                  <span className="text-xs text-muted-foreground">
+                    Part of Speech
+                  </span>
+                  <span className="font-medium">
+                    {posDescriptions[pos] || pos}
+                  </span>
+                </div>
+
+                {/* Folder information */}
+                <div className="flex flex-col p-2 bg-muted/50 rounded">
+                  <span className="text-xs text-muted-foreground">Folder</span>
+                  <span className="font-medium">
+                    {folderName || "Not categorized"}
+                  </span>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

@@ -14,6 +14,8 @@ export type FlashcardResponse = {
   user_id: string;
   created_at: string;
   folder_id?: string;
+  source_lang?: string;
+  target_lang?: string;
 };
 
 export interface FlashcardData {
@@ -24,4 +26,6 @@ export interface FlashcardData {
   pos: string;
   example: string;
   notes: string;
+  source_lang?: string;
+  target_lang?: string;
 }
