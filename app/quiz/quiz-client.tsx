@@ -25,6 +25,7 @@ import { FlashcardResponse } from "@/types/flashcard";
 import { ArrowRight, Check, Loader, RefreshCw, Volume2, X } from "lucide-react";
 import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -54,6 +55,7 @@ export function QuizClient({ session }: { session: Session }) {
     incorrect: 0,
   });
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
 
   // Fetch folders on mount
   useEffect(() => {
@@ -87,7 +89,25 @@ export function QuizClient({ session }: { session: Session }) {
       const session = await getSession();
       const token = session?.accessToken;
 
-      // Construct URL with query params
+      // First create a session
+      const sessionRes = await fetch(`${apiUrl}/quiz/session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          folder_id: selectedFolderId === "all" ? null : selectedFolderId,
+          card_count: quizOptions.cardCount,
+          include_reverse: quizOptions.includeReverse,
+        }),
+      });
+
+      if (!sessionRes.ok) throw new Error("Failed to create quiz session");
+      const sessionData = await sessionRes.json();
+      setQuizSessionId(sessionData.id);
+
+      // Then fetch quiz cards
       const url = new URL(`${apiUrl}/quiz`);
       url.searchParams.append("count", quizOptions.cardCount.toString());
       url.searchParams.append(
@@ -95,7 +115,7 @@ export function QuizClient({ session }: { session: Session }) {
         quizOptions.includeReverse.toString()
       );
 
-      if (selectedFolderId) {
+      if (selectedFolderId !== "all") {
         url.searchParams.append("folder_id", selectedFolderId);
       }
 
@@ -140,12 +160,41 @@ export function QuizClient({ session }: { session: Session }) {
     speechSynthesis.speak(utterance);
   };
 
-  const handleCardResult = (correct: boolean) => {
+  const handleCardResult = async (correct: boolean) => {
+    if (!quizSessionId || !quizCards[currentCardIndex]) {
+      console.error("Missing session ID or card data");
+      return;
+    }
+
+    // Update local results state
     setResults((prev) => ({
       correct: correct ? prev.correct + 1 : prev.correct,
       incorrect: correct ? prev.incorrect : prev.incorrect + 1,
     }));
 
+    // Log the answer to the backend
+    try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
+      await fetch(`${apiUrl}/quiz/session/answer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          session_id: quizSessionId,
+          flashcard_id: quizCards[currentCardIndex].id,
+          is_correct: correct,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to log answer:", error);
+      // Continue quiz even if logging fails
+    }
+
+    // Always increment card index to properly trigger completion
     setCurrentCardIndex(currentCardIndex + 1);
     setIsFlipped(false);
 
@@ -179,6 +228,9 @@ export function QuizClient({ session }: { session: Session }) {
       <div className="max-w-lg mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Quiz Mode</h1>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/quiz/history">View History</Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={restartQuiz}>
             Exit Quiz
           </Button>
@@ -334,7 +386,13 @@ export function QuizClient({ session }: { session: Session }) {
               <RefreshCw className="mr-2 h-4 w-4" />
               New Quiz
             </Button>
-            <Button onClick={() => startQuiz()}>Retry Same Cards</Button>
+            {quizSessionId && (
+              <Button
+                onClick={() => router.push(`/quiz/session/${quizSessionId}`)}
+              >
+                View Detailed Results
+              </Button>
+            )}
           </CardFooter>
         </Card>
       </div>
@@ -343,7 +401,12 @@ export function QuizClient({ session }: { session: Session }) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Quiz Mode</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Quiz Mode</h1>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/quiz/history">View History</Link>
+        </Button>
+      </div>
 
       <Card>
         <CardHeader>
