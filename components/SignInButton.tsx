@@ -1,15 +1,33 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { signIn } from "next-auth/react";
+import { ComponentPropsWithoutRef } from "react";
 
-export function SignInButton() {
+// Extract the Button's prop types using React's utility type
+type ButtonProps = ComponentPropsWithoutRef<typeof Button>;
+
+type SignInButtonProps = ButtonProps & {
+  label?: string;
+};
+
+export function SignInButton({
+  className,
+  variant = "default",
+  size,
+  label = "Get Started",
+  ...props
+}: SignInButtonProps) {
   return (
     <Button
-      className="w-full"
+      className={cn("", className)}
+      variant={variant}
+      size={size}
       onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+      {...props}
     >
-      Get Started
+      {label}
     </Button>
   );
 }
