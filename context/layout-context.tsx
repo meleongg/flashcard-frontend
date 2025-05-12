@@ -1,41 +1,42 @@
 "use client";
 
-import {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useState,
-} from "react";
+import { createContext, useContext, useState } from "react";
 
-type LayoutContextType = {
+interface LayoutContextType {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   closeSidebar: () => void;
-};
+  isDesktopCollapsed: boolean;
+  toggleDesktopSidebar: () => void;
+}
 
-// Create context with default values to avoid undefined checks
-const LayoutContext = createContext<LayoutContextType>({
-  sidebarOpen: false,
-  toggleSidebar: () => {},
-  closeSidebar: () => {},
-});
+const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
-export function LayoutProvider({ children }: { children: ReactNode }) {
+export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
 
-  // Use useCallback to maintain reference stability
-  const toggleSidebar = useCallback(() => {
+  const toggleSidebar = () => {
     setSidebarOpen((prev) => !prev);
-  }, []);
+  };
 
-  const closeSidebar = useCallback(() => {
+  const closeSidebar = () => {
     setSidebarOpen(false);
-  }, []);
+  };
+
+  const toggleDesktopSidebar = () => {
+    setIsDesktopCollapsed((prev) => !prev);
+  };
 
   return (
     <LayoutContext.Provider
-      value={{ sidebarOpen, toggleSidebar, closeSidebar }}
+      value={{
+        sidebarOpen,
+        toggleSidebar,
+        closeSidebar,
+        isDesktopCollapsed,
+        toggleDesktopSidebar,
+      }}
     >
       {children}
     </LayoutContext.Provider>
@@ -43,5 +44,9 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
 }
 
 export function useLayout() {
-  return useContext(LayoutContext);
+  const context = useContext(LayoutContext);
+  if (context === undefined) {
+    throw new Error("useLayout must be used within a LayoutProvider");
+  }
+  return context;
 }
