@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashcardCreator } from "@/components/FlashcardCreator";
 import { FlashcardResult } from "@/components/FlashcardResult";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppContext } from "@/context/app-context";
 import { apiUrl } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,7 @@ import {
   Grid,
   List,
   Loader,
+  Plus,
   SlidersHorizontal,
 } from "lucide-react";
 import { Session } from "next-auth";
@@ -36,7 +39,7 @@ import { getSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const pageSize = 10; // Increased from 5 for better mobile experience
+const pageSize = 10;
 
 export function FlashcardsClient({ session }: { session: Session }) {
   const {
@@ -54,6 +57,7 @@ export function FlashcardsClient({ session }: { session: Session }) {
   const [allFlashcards, setAllFlashcards] = useState<FlashcardResponse[]>([]);
   const [totalFlashcards, setTotalFlashcards] = useState(0);
   const [isLoadingCards, setIsLoadingCards] = useState(false);
+  const [activeTab, setActiveTab] = useState("browse");
 
   const recentFolderIds = new Set(recentFolders.map((f) => f.id));
   const nonRecentFolders = folders.filter((f) => !recentFolderIds.has(f.id));
@@ -187,255 +191,305 @@ export function FlashcardsClient({ session }: { session: Session }) {
     fetchFlashcards(page);
   }, [page, selectedFolderId, flashcardsVersion]);
 
+  // Handle route parameters
+  useEffect(() => {
+    // Check URL parameters for create=true
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldCreateNew = urlParams.get("create") === "true";
+    const prefilledText = urlParams.get("text") || "";
+
+    if (shouldCreateNew) {
+      setActiveTab("create");
+
+      // If text parameter exists, set it in the creator
+      if (prefilledText) {
+        // You may want to pass this down to FlashcardCreator
+        // through a prop like initialWord
+      }
+    }
+  }, []);
+
   // Calculate total pages for pagination
   const totalPages = Math.ceil(totalFlashcards / pageSize);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
-      {/* Improved header with better mobile layout */}
-      <div className="flex flex-col gap-4">
+      {/* Main Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold sm:text-2xl">Your Flashcards</h1>
+          <TabsList>
+            <TabsTrigger value="browse">Browse</TabsTrigger>
+            <TabsTrigger value="create">Create</TabsTrigger>
+          </TabsList>
 
-          {/* Mobile-optimized controls group */}
-          <div className="flex items-center gap-2">
-            {/* View toggle */}
-            <div className="flex items-center rounded-md border">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className={cn(
-                  "h-8 px-2 sm:px-3",
-                  viewMode === "list" && "bg-muted"
-                )}
-              >
-                <List className="h-4 w-4" />
-                <span className="ml-2 hidden sm:inline">List</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode("grid")}
-                className={cn(
-                  "h-8 px-2 sm:px-3",
-                  viewMode === "grid" && "bg-muted"
-                )}
-              >
-                <Grid className="h-4 w-4" />
-                <span className="ml-2 hidden sm:inline">Grid</span>
-              </Button>
-            </div>
-
-            {/* Options menu for mobile */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild className="lg:hidden">
-                <Button variant="outline" size="icon" className="h-8 w-8">
-                  <SlidersHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
-                <DropdownMenuItem className="flex flex-col items-start gap-2">
-                  <span className="text-xs font-medium text-muted-foreground w-full">
-                    Folder
-                  </span>
-                  <Select
-                    value={selectedFolderId}
-                    onValueChange={(value) => {
-                      setSelectedFolderId(value);
-                      setPage(0);
-                    }}
-                  >
-                    <SelectTrigger className="w-full h-8 text-xs">
-                      <SelectValue placeholder="Select folder" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Flashcards</SelectItem>
-                      {folders.map((folder) => (
-                        <SelectItem key={folder.id} value={folder.id}>
-                          {folder.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        {/* Better organized controls row - hidden on mobile, shown in options menu instead */}
-        <div className="hidden lg:flex items-center justify-between">
-          {/* Folder selector */}
-          <div className="flex items-center gap-2">
+          {/* Only show view controls in browse tab */}
+          {activeTab === "browse" && (
             <div className="flex items-center gap-2">
-              <Folder className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Folder:</span>
-            </div>
-            <Select
-              value={selectedFolderId}
-              onValueChange={(value) => {
-                setSelectedFolderId(value);
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select folder" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Flashcards</SelectItem>
-
-                {recentFolders.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel>Recent Folders</SelectLabel>
-                    {recentFolders.map((folder) => (
-                      <SelectItem key={`recent-${folder.id}`} value={folder.id}>
-                        {folder.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                )}
-
-                {nonRecentFolders.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel>All Folders</SelectLabel>
-                    {nonRecentFolders.map((folder) => (
-                      <SelectItem key={`all-${folder.id}`} value={folder.id}>
-                        {folder.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Count display */}
-          <p className="text-sm text-muted-foreground">
-            {totalFlashcards > 0 && (
-              <>
-                Showing {page * pageSize + 1}-
-                {Math.min((page + 1) * pageSize, totalFlashcards)} of{" "}
-                {totalFlashcards}
-              </>
-            )}
-          </p>
-        </div>
-
-        {/* Mobile-only count display - simplified */}
-        <div className="flex lg:hidden justify-center">
-          <div className="px-3 py-1 bg-muted rounded-full">
-            <p className="text-xs text-muted-foreground">
-              {(() => {
-                // Get folder once to avoid duplicate lookups
-                if (selectedFolderId !== "all") {
-                  const folder = folders.find((f) => f.id === selectedFolderId);
-                  if (folder) {
-                    return (
-                      <span className="font-medium mr-1">{folder.name}:</span>
-                    );
-                  }
-                }
-                return null;
-              })()}
-              {totalFlashcards} card{totalFlashcards !== 1 && "s"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Improved flashcards grid with better responsiveness */}
-      <div
-        className={cn(
-          viewMode === "grid"
-            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            : "space-y-4"
-        )}
-      >
-        {isLoadingCards ? (
-          <div className="flex justify-center py-8 col-span-full">
-            <Loader className="animate-spin h-8 w-8 text-primary" />
-          </div>
-        ) : allFlashcards.length > 0 ? (
-          <>
-            {allFlashcards.map((fc) => (
-              <FlashcardResult
-                key={fc.id}
-                id={fc.id}
-                word={fc.word}
-                translation={fc.translation}
-                phonetic={fc.phonetic}
-                pos={fc.pos}
-                example={fc.example}
-                notes={fc.notes}
-                folderId={fc.folder_id}
-                folderName={folders.find((f) => f.id === fc.folder_id)?.name}
-                folders={folders}
-                source_lang={fc.source_lang}
-                target_lang={fc.target_lang}
-                onDelete={deleteFlashcard}
-                onEdit={editFlashcard}
-                viewMode={viewMode}
-              />
-            ))}
-
-            {/* Simplified pagination */}
-            {totalPages > 1 && (
-              <div
-                className={cn(
-                  "flex justify-center items-center gap-3 pt-6",
-                  viewMode === "grid" && "col-span-full"
-                )}
-              >
+              <div className="flex items-center rounded-md border">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => setPage(Math.max(0, page - 1))}
-                  disabled={page === 0 || isLoadingCards}
-                  className="h-8 px-2 sm:px-3"
+                  onClick={() => setViewMode("list")}
+                  className={cn(
+                    "h-8 px-2 sm:px-3",
+                    viewMode === "list" && "bg-muted"
+                  )}
                 >
-                  <ChevronLeft className="h-4 w-4" />
-                  <span className="ml-1 hidden sm:inline">Previous</span>
+                  <List className="h-4 w-4" />
+                  <span className="ml-2 hidden sm:inline">List</span>
                 </Button>
-
-                <span className="text-sm">
-                  <span className="hidden sm:inline">Page </span>
-                  {page + 1} / {totalPages}
-                </span>
-
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => setPage(page + 1)}
-                  disabled={
-                    (page + 1) * pageSize >= totalFlashcards || isLoadingCards
-                  }
-                  className="h-8 px-2 sm:px-3"
+                  onClick={() => setViewMode("grid")}
+                  className={cn(
+                    "h-8 px-2 sm:px-3",
+                    viewMode === "grid" && "bg-muted"
+                  )}
                 >
-                  <span className="mr-1 hidden sm:inline">Next</span>
-                  <ChevronRight className="h-4 w-4" />
+                  <Grid className="h-4 w-4" />
+                  <span className="ml-2 hidden sm:inline">Grid</span>
                 </Button>
               </div>
-            )}
-          </>
-        ) : (
-          <div
-            className={cn(
-              "flex flex-col items-center justify-center py-8 text-center",
-              viewMode === "grid" && "col-span-full"
-            )}
-          >
-            <div className="bg-muted/20 p-6 rounded-lg max-w-md">
-              <p className="font-medium mb-2">No flashcards found</p>
+            </div>
+          )}
+        </div>
+
+        {/* Browse Tab Content */}
+        <TabsContent value="browse" className="mt-6">
+          {/* Folder filters */}
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-xl font-bold sm:text-2xl">Your Flashcards</h1>
+
+              {/* Mobile filters button */}
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild className="lg:hidden">
+                    <Button variant="outline" size="icon" className="h-8 w-8">
+                      <SlidersHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    <DropdownMenuItem className="flex flex-col items-start gap-2">
+                      <span className="text-xs font-medium text-muted-foreground w-full">
+                        Folder
+                      </span>
+                      <Select
+                        value={selectedFolderId}
+                        onValueChange={(value) => {
+                          setSelectedFolderId(value);
+                          setPage(0);
+                        }}
+                      >
+                        <SelectTrigger className="w-full h-8 text-xs">
+                          <SelectValue placeholder="Select folder" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Flashcards</SelectItem>
+                          {folders.map((folder) => (
+                            <SelectItem key={folder.id} value={folder.id}>
+                              {folder.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {/* Desktop folder filters */}
+            <div className="hidden lg:flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Folder className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Folder:</span>
+                </div>
+                <Select
+                  value={selectedFolderId}
+                  onValueChange={(value) => {
+                    setSelectedFolderId(value);
+                    setPage(0);
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Flashcards</SelectItem>
+                    {recentFolders.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Recent Folders</SelectLabel>
+                        {recentFolders.map((folder) => (
+                          <SelectItem
+                            key={`recent-${folder.id}`}
+                            value={folder.id}
+                          >
+                            {folder.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+
+                    {nonRecentFolders.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>All Folders</SelectLabel>
+                        {nonRecentFolders.map((folder) => (
+                          <SelectItem
+                            key={`all-${folder.id}`}
+                            value={folder.id}
+                          >
+                            {folder.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-sm text-muted-foreground">
-                {selectedFolderId !== "all"
-                  ? "This folder doesn't contain any flashcards yet."
-                  : "You haven't created any flashcards yet."}
+                {totalFlashcards > 0 && (
+                  <>
+                    Showing {page * pageSize + 1}-
+                    {Math.min((page + 1) * pageSize, totalFlashcards)} of{" "}
+                    {totalFlashcards}
+                  </>
+                )}
               </p>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Flashcards display */}
+          <div
+            className={cn(
+              viewMode === "grid"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                : "space-y-4"
+            )}
+          >
+            {/* Loading, empty, and flashcards display logic */}
+            {isLoadingCards ? (
+              <div className="flex justify-center py-8 col-span-full">
+                <Loader className="animate-spin h-8 w-8 text-primary" />
+              </div>
+            ) : allFlashcards.length > 0 ? (
+              <>
+                {allFlashcards.map((fc) => (
+                  <FlashcardResult
+                    key={fc.id}
+                    id={fc.id}
+                    word={fc.word}
+                    translation={fc.translation}
+                    phonetic={fc.phonetic}
+                    pos={fc.pos}
+                    example={fc.example}
+                    notes={fc.notes}
+                    folderId={fc.folder_id}
+                    folderName={
+                      folders.find((f) => f.id === fc.folder_id)?.name
+                    }
+                    folders={folders}
+                    source_lang={fc.source_lang}
+                    target_lang={fc.target_lang}
+                    onDelete={deleteFlashcard}
+                    onEdit={editFlashcard}
+                    viewMode={viewMode}
+                  />
+                ))}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div
+                    className={cn(
+                      "flex justify-center items-center gap-3 pt-6",
+                      viewMode === "grid" && "col-span-full"
+                    )}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(Math.max(0, page - 1))}
+                      disabled={page === 0 || isLoadingCards}
+                      className="h-8 px-2 sm:px-3"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="ml-1 hidden sm:inline">Previous</span>
+                    </Button>
+
+                    <span className="text-sm">
+                      <span className="hidden sm:inline">Page </span>
+                      {page + 1} / {totalPages}
+                    </span>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page + 1)}
+                      disabled={
+                        (page + 1) * pageSize >= totalFlashcards ||
+                        isLoadingCards
+                      }
+                      className="h-8 px-2 sm:px-3"
+                    >
+                      <span className="mr-1 hidden sm:inline">Next</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div
+                className={cn(
+                  "flex flex-col items-center justify-center py-8 text-center",
+                  viewMode === "grid" && "col-span-full"
+                )}
+              >
+                <div className="bg-muted/20 p-6 rounded-lg max-w-md">
+                  <p className="font-medium mb-2">No flashcards found</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {selectedFolderId !== "all"
+                      ? "This folder doesn't contain any flashcards yet."
+                      : "You haven't created any flashcards yet."}
+                  </p>
+                  <Button
+                    onClick={() => setActiveTab("create")}
+                    className="gap-1"
+                  >
+                    <Plus className="h-4 w-4" /> Create New Flashcard
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Create Tab Content */}
+        <TabsContent value="create" className="mt-6">
+          <FlashcardCreator
+            session={session}
+            folders={folders}
+            onSaveSuccess={() => {
+              fetchFlashcards();
+              setActiveTab("browse");
+            }}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {/* Mobile FAB for quick creation */}
+      {activeTab === "browse" && allFlashcards.length > 0 && (
+        <div className="fixed bottom-6 right-6 lg:hidden">
+          <Button
+            onClick={() => setActiveTab("create")}
+            size="icon"
+            className="h-14 w-14 rounded-full shadow-lg"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

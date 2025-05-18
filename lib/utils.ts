@@ -51,3 +51,25 @@ export function formatDate(
     return dateObj.toISOString().split("T")[0];
   }
 }
+
+export function formatDistanceToNow(date: Date): string {
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(
+    (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+  );
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (diffMs < 0) {
+    return "Now";
+  } else if (diffDays > 0) {
+    return `in ${diffDays} day${diffDays !== 1 ? "s" : ""}`;
+  } else if (diffHours > 0) {
+    return `in ${diffHours} hour${diffHours !== 1 ? "s" : ""}`;
+  } else if (diffMinutes > 0) {
+    return `in ${diffMinutes} minute${diffMinutes !== 1 ? "s" : ""}`;
+  } else {
+    return "Now";
+  }
+}

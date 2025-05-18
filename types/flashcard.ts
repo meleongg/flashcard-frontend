@@ -29,3 +29,14 @@ export interface FlashcardData {
   source_lang?: string;
   target_lang?: string;
 }
+
+export interface FlashcardReviewPreview {
+  id: string;
+  word: string;
+  translation: string;
+  phonetic?: string;
+  pos: string;
+  example?: string;
+  next_review_date: string;
+  interval: number;
+}
