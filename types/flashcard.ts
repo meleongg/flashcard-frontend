@@ -26,6 +26,7 @@ export interface FlashcardData {
   pos: string;
   example: string;
   notes: string;
+  folder_id?: string;
   source_lang?: string;
   target_lang?: string;
 }

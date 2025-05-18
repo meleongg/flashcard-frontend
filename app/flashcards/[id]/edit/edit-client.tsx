@@ -107,22 +107,50 @@ export function EditFlashcardClient({
     try {
       const session = await getSession();
       const token = session?.accessToken;
+      const originalFolderId = flashcard.folder_id || "none";
+      const folderChanged = selectedFolder !== originalFolderId;
 
-      const payload = {
-        ...flashcard,
-        folder_id: selectedFolder === "none" ? "" : selectedFolder,
+      const contentPayload = {
+        word: flashcard.word,
+        translation: flashcard.translation,
+        phonetic: flashcard.phonetic,
+        pos: flashcard.pos,
+        example: flashcard.example,
+        notes: flashcard.notes,
       };
 
-      const res = await fetch(`${apiUrl}/flashcard/${id}`, {
+      const contentRes = await fetch(`${apiUrl}/flashcard/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(contentPayload),
       });
 
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      if (!contentRes.ok) {
+        throw new Error(`Failed to update flashcard: ${contentRes.status}`);
+      }
+
+      // Step 2: Update folder assignment if needed
+      if (folderChanged) {
+        const folderPayload = {
+          folder_id: selectedFolder === "none" ? null : selectedFolder,
+        };
+
+        const folderRes = await fetch(`${apiUrl}/flashcard/${id}/folder`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(folderPayload),
+        });
+
+        if (!folderRes.ok) {
+          throw new Error(`Failed to update folder: ${folderRes.status}`);
+        }
+      }
 
       toast.success("Flashcard updated successfully");
       refreshFlashcards(); // Update any other components
