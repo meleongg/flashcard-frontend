@@ -105,6 +105,34 @@ export function DashboardClient({ session }: { session: Session }) {
     }
   };
 
+  // Start a review session and navigate to the review page
+  const startReviewSession = async () => {
+    try {
+      const session = await getSession();
+      const token = session?.accessToken;
+
+      const startRes = await fetch(`${apiUrl}/review-sessions/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!startRes.ok) {
+        throw new Error("Failed to start review session");
+      }
+
+      const { session_id } = await startRes.json();
+
+      // Navigate to review page with session ID
+      window.location.href = `/flashcards/review?session=${session_id}`;
+    } catch (error) {
+      console.error("Error starting review session:", error);
+      toast.error("Failed to start review session");
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 p-4">
       <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -135,11 +163,9 @@ export function DashboardClient({ session }: { session: Session }) {
           </CardContent>
           <CardFooter>
             {reviewStats.dueCount > 0 ? (
-              <Button asChild className="w-full" size="sm">
-                <Link href="/flashcards/review">
-                  Review Now
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
+              <Button onClick={startReviewSession} className="w-full" size="sm">
+                Review Now
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
               <Button

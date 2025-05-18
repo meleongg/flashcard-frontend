@@ -15,6 +15,12 @@ import { getLanguageName, posDescriptions } from "@/lib/language-helpers";
 import { cn } from "@/lib/utils";
 import { FlashcardResponse } from "@/types/flashcard";
 import {
+  ReviewRating,
+  ReviewSessionSummary,
+  ReviewStats,
+  ReviewStatus,
+} from "@/types/review";
+import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
@@ -29,32 +35,6 @@ import { getSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
-enum ReviewStatus {
-  LOADING,
-  READY,
-  IN_PROGRESS,
-  FLIPPED,
-  COMPLETE,
-  ERROR,
-  EMPTY,
-}
-
-enum ReviewRating {
-  FAILED = 0, // Complete failure to recall
-  BAD = 1, // Incorrect response but recognized answer
-  DIFFICULT = 2, // Correct response with significant difficulty
-  GOOD = 3, // Correct response with some effort
-  EASY = 4, // Correct response with little effort
-  PERFECT = 5, // Perfect recall
-}
-
-interface ReviewStats {
-  cardsReviewed: number;
-  correct: number;
-  wrong: number;
-  remaining: number;
-}
 
 export function FlashcardReviewClient({ session }: { session: Session }) {
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>(
@@ -71,11 +51,30 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // New state for tracking the review session
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Add a new state for the session summary
+  const [sessionSummary, setSessionSummary] =
+    useState<ReviewSessionSummary | null>(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+
   useEffect(() => {
-    fetchCards();
+    // Check URL for session parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionParam = urlParams.get("session");
+
+    if (sessionParam) {
+      setSessionId(sessionParam);
+      // Since we already have a session ID, we can auto-start the review
+      // after fetching cards
+      fetchCards(true);
+    } else {
+      fetchCards(false);
+    }
   }, []);
 
-  const fetchCards = async () => {
+  const fetchCards = async (autoStart = false) => {
     try {
       const sessionObj = await getSession();
       const token = sessionObj?.accessToken;
@@ -104,7 +103,15 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
         wrong: 0,
         remaining: data.length,
       });
-      setReviewStatus(ReviewStatus.READY);
+
+      // If we were passed a session ID in the URL, auto-start the review
+      if (autoStart && sessionId) {
+        setReviewStatus(ReviewStatus.IN_PROGRESS);
+        setCurrentCardIndex(0);
+        setIsFlipped(false);
+      } else {
+        setReviewStatus(ReviewStatus.READY);
+      }
     } catch (error) {
       console.error("Error fetching review cards:", error);
       setReviewStatus(ReviewStatus.ERROR);
@@ -112,11 +119,70 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
     }
   };
 
-  const startReview = () => {
-    if (cards.length > 0) {
+  // Modified to start a review session
+  const startReview = async () => {
+    if (cards.length === 0) return;
+
+    try {
+      // Start a new review session
+      const sessionObj = await getSession();
+      const token = sessionObj?.accessToken;
+
+      const startRes = await fetch(`${apiUrl}/review-sessions/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!startRes.ok) {
+        throw new Error("Failed to start review session");
+      }
+
+      const { session_id } = await startRes.json();
+      setSessionId(session_id);
+
+      // Initialize review
       setReviewStatus(ReviewStatus.IN_PROGRESS);
       setCurrentCardIndex(0);
       setIsFlipped(false);
+
+      toast.success("Review session started");
+    } catch (error) {
+      console.error("Error starting review session:", error);
+      toast.error("Failed to start review session. Please try again.");
+    }
+  };
+
+  const fetchSessionSummary = async (sessionId: string) => {
+    if (!sessionId) return;
+
+    setIsSummaryLoading(true);
+    try {
+      const sessionObj = await getSession();
+      const token = sessionObj?.accessToken;
+
+      const res = await fetch(
+        `${apiUrl}/review-sessions/${sessionId}/summary`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch session summary: ${res.status}`);
+      }
+
+      const summaryData = await res.json();
+      setSessionSummary(summaryData);
+    } catch (error) {
+      console.error("Error fetching session summary:", error);
+      toast.error("Failed to load session details");
+    } finally {
+      setIsSummaryLoading(false);
     }
   };
 
@@ -140,8 +206,9 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
     window.speechSynthesis.speak(utterance);
   };
 
+  // Updated to include session_id
   const submitReview = async (quality: ReviewRating) => {
-    if (isSubmitting) return;
+    if (isSubmitting || !sessionId) return;
 
     const currentCard = cards[currentCardIndex];
     if (!currentCard) return;
@@ -152,15 +219,17 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
       const sessionObj = await getSession();
       const token = sessionObj?.accessToken;
 
-      // Updated to match the API endpoint format
-      const res = await fetch(`${apiUrl}/flashcards/${currentCard.id}/review`, {
+      // Use the session-based endpoint
+      const res = await fetch(`${apiUrl}/review-sessions/${sessionId}/review`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        // Using the quality parameter format the API expects
-        body: JSON.stringify({ quality }),
+        body: JSON.stringify({
+          flashcard_id: currentCard.id,
+          quality,
+        }),
       });
 
       if (!res.ok) {
@@ -182,7 +251,13 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
         setIsFlipped(false);
         setReviewStatus(ReviewStatus.IN_PROGRESS);
       } else {
+        // If this was the last card, finish the review and fetch summary
         setReviewStatus(ReviewStatus.COMPLETE);
+
+        // Fetch the session summary
+        if (sessionId) {
+          fetchSessionSummary(sessionId);
+        }
       }
     } catch (error) {
       console.error("Error submitting review:", error);
@@ -192,8 +267,9 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
     }
   };
 
+  // Updated to pass sessionId
   const resetCard = async () => {
-    if (isSubmitting || !currentCard) return;
+    if (isSubmitting || !currentCard || !sessionId) return;
 
     setIsSubmitting(true);
     try {
@@ -205,6 +281,10 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        // Include session_id if your reset endpoint needs it
+        body: JSON.stringify({
+          session_id: sessionId,
+        }),
       });
 
       if (!res.ok) {
@@ -234,8 +314,16 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6">
+      {/* Header with session status indicator */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Flashcard Review</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Flashcard Review</h1>
+          {sessionId && (
+            <p className="text-xs text-muted-foreground">
+              Session ID: {sessionId.substring(0, 8)}...
+            </p>
+          )}
+        </div>
         <Button variant="outline" size="sm" asChild>
           <Link href="/dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
@@ -259,7 +347,7 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
             </CardDescription>
           </CardHeader>
           <CardFooter>
-            <Button onClick={fetchCards}>Try Again</Button>
+            <Button onClick={() => fetchCards(false)}>Try Again</Button>
           </CardFooter>
         </Card>
       )}
@@ -582,7 +670,71 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
                 <div className="text-xs text-muted-foreground">Accuracy</div>
               </div>
             </div>
-            <p className="text-sm text-center text-muted-foreground">
+
+            {/* New section for the session summary */}
+            {isSummaryLoading ? (
+              <div className="flex justify-center py-4">
+                <Loader className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : sessionSummary ? (
+              <div className="mt-6 space-y-4">
+                <h3 className="text-lg font-medium">Session Details</h3>
+
+                {/* Average rating */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">
+                    Average Rating:
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-sm font-medium">
+                      {sessionSummary.average_rating.toFixed(1)}
+                    </div>
+                    <RatingVisual rating={sessionSummary.average_rating} />
+                  </div>
+                </div>
+
+                {/* Rating breakdown */}
+                <div className="border rounded-md p-4">
+                  <h4 className="text-sm font-medium mb-3">Rating Breakdown</h4>
+
+                  <div className="space-y-2">
+                    {Object.entries(sessionSummary.ratings_breakdown)
+                      .filter(([_, count]) => count > 0) // Only show ratings with counts
+                      .sort((a, b) => parseInt(b[0]) - parseInt(a[0])) // Sort by rating (highest first)
+                      .map(([rating, count]) => (
+                        <div
+                          key={rating}
+                          className="flex justify-between items-center"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RatingBadge rating={parseInt(rating)} />
+                            <span className="text-sm">
+                              {getRatingLabel(parseInt(rating))}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 bg-primary/10 rounded-full w-24 overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full"
+                                style={{
+                                  width: `${
+                                    (count / sessionSummary.total_cards) * 100
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground w-8 text-right">
+                              {count}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <p className="text-sm text-center text-muted-foreground mt-6">
               Great job! Regular reviews improve long-term memory retention.
             </p>
           </CardContent>
@@ -598,4 +750,77 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
       )}
     </div>
   );
+
+  // These are helper components for displaying the rating visually
+  function RatingVisual({ rating }: { rating: number }) {
+    const fullStars = Math.floor(rating);
+    const remainder = rating - fullStars;
+    const stars = [];
+
+    // Add full stars
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(
+          <span key={i} className="text-yellow-500">
+            ★
+          </span>
+        );
+      } else if (i === fullStars && remainder > 0) {
+        // Show partial star
+        stars.push(
+          <span key={i} className="text-yellow-500 opacity-50">
+            ★
+          </span>
+        );
+      } else {
+        stars.push(
+          <span key={i} className="text-muted-foreground opacity-30">
+            ★
+          </span>
+        );
+      }
+    }
+
+    return <div className="flex">{stars}</div>;
+  }
+
+  function RatingBadge({ rating }: { rating: number }) {
+    const colors = {
+      0: "bg-red-500/10 text-red-600",
+      1: "bg-red-400/10 text-red-500",
+      2: "bg-amber-400/10 text-amber-500",
+      3: "bg-lime-400/10 text-lime-600",
+      4: "bg-green-400/10 text-green-600",
+      5: "bg-primary/10 text-primary",
+    };
+
+    return (
+      <span
+        className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-xs font-medium ${
+          colors[rating as keyof typeof colors]
+        }`}
+      >
+        {rating}
+      </span>
+    );
+  }
+
+  function getRatingLabel(rating: number): string {
+    switch (rating) {
+      case 0:
+        return "Failed";
+      case 1:
+        return "Bad";
+      case 2:
+        return "Difficult";
+      case 3:
+        return "Good";
+      case 4:
+        return "Easy";
+      case 5:
+        return "Perfect";
+      default:
+        return "";
+    }
+  }
 }
