@@ -340,6 +340,19 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
                   isFlipped && "ring-2 ring-primary/20"
                 )}
               >
+                {/* Add Reset button here, at the top of the Card */}
+                {isFlipped && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetCard}
+                    disabled={isSubmitting}
+                    className="text-xs opacity-70 hover:opacity-100 absolute top-2 right-2 z-10"
+                  >
+                    Reset Progress
+                  </Button>
+                )}
+
                 <div
                   onClick={() => !isFlipped && flipCard()}
                   className={cn(
@@ -524,19 +537,6 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
                 </Button>
               )}
             </div>
-
-            {/* Reset button - only show when card is flipped */}
-            {isFlipped && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={resetCard}
-                disabled={isSubmitting}
-                className="text-xs opacity-70 hover:opacity-100 absolute top-2 right-2"
-              >
-                Reset Progress
-              </Button>
-            )}
           </>
         )}
 
