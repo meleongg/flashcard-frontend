@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
-import { KeyboardEvent, useRef, useState } from "react";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface FlashcardCreatorProps {

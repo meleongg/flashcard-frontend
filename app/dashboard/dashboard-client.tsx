@@ -9,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { apiUrl } from "@/lib/constants";
 import { cn, formatDistanceToNow } from "@/lib/utils";
 import { FlashcardReviewPreview } from "@/types/flashcard";
@@ -19,7 +18,6 @@ import {
   BookOpen,
   Calendar,
   Clock,
-  Lightbulb,
   Loader,
   Plus,
 } from "lucide-react";
@@ -210,25 +208,18 @@ export function DashboardClient({ session }: { session: Session }) {
           </CardContent>
         </Card>
 
-        {/* Quick Add */}
         <Card className="col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              Quick Add
+              <Plus className="h-4 w-4 text-primary" />
+              Create Flashcard
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <Input
-              placeholder="New word..."
-              className="text-sm h-8"
-              value={quickAddText}
-              onChange={(e) => setQuickAddText(e.target.value)}
-              onKeyDown={handleQuickAddEnter}
-            />
+          <CardContent className="text-sm text-muted-foreground">
+            Add new vocabulary to your collection
           </CardContent>
           <CardFooter>
-            <Button variant="outline" size="sm" className="w-full" asChild>
+            <Button variant="default" size="sm" className="w-full" asChild>
               <Link href="/flashcards?create=true">
                 Create New Card
                 <Plus className="ml-1 h-3 w-3" />
