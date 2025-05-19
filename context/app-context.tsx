@@ -30,7 +30,7 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   // Initialize state, potentially from localStorage
   const [languageDirection, setLanguageDirection] = useState("auto-en");
-  const [selectedFolderId, setSelectedFolderId] = useState("none");
+  const [selectedFolderId, setSelectedFolderId] = useState("all");
   const [recentFolders, setRecentFolders] = useState<Folder[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [flashcardsVersion, setFlashcardsVersion] = useState(0);
