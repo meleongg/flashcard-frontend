@@ -73,3 +73,18 @@ export function formatDistanceToNow(date: Date): string {
     return "Now";
   }
 }
+
+export function formatPOS(pos: string) {
+  const posMap: { [key: string]: string } = {
+    noun: "Noun",
+    verb: "Verb",
+    adjective: "Adjective",
+    adverb: "Adverb",
+    pronoun: "Pronoun",
+    preposition: "Preposition",
+    conjunction: "Conjunction",
+    interjection: "Interjection",
+  };
+
+  return posMap[pos.toLowerCase()] || pos;
+}

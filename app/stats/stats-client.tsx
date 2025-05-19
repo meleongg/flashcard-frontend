@@ -4,14 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiUrl } from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatPOS } from "@/lib/utils";
+import { StatsData } from "@/types/stats";
 import {
+  Activity,
   Award,
+  BarChart3,
+  BookOpen,
   Brain,
   Calendar,
-  BarChart as ChartIcon,
-  ListTodo,
+  LineChart as ChartIcon,
+  CheckSquare,
   Loader,
+  Package,
+  Paintbrush,
   Repeat,
   Target,
   Zap,
@@ -32,31 +38,106 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 
-// Define the types for our enhanced stats response
-interface StatsData {
-  // Quiz stats
-  total_quizzes: number;
-  total_answers: number;
-  correct_answers: number;
-  accuracy_percent: number;
+// Helper function to get insights from POS distribution
+function getPOSInsights(posDistribution: { pos: string; count: number }[]) {
+  const total = posDistribution.reduce((sum, item) => sum + item.count, 0);
 
-  // Review stats
-  total_reviews: number;
-  cards_reviewed: number;
-  avg_cards_per_session: number;
-  retention_rate: number;
-  review_retention_over_time: {
-    date: string;
-    rate: number;
-  }[];
-  interval_distribution: {
-    interval: string;
-    count: number;
-  }[];
+  if (total === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No data available yet. Add flashcards to see insights.
+      </p>
+    );
+  }
 
-  // General stats
-  streak_days: number;
-  recent_activity: string[];
+  // Get percentages by POS
+  const percentages: Record<string, number> = {};
+  posDistribution.forEach((item) => {
+    percentages[item.pos] = Math.round((item.count / total) * 100);
+  });
+
+  // Check for imbalances
+  const nounPerc = percentages["NOUN"] || 0;
+  const verbPerc = percentages["VERB"] || 0;
+  const adjPerc = percentages["ADJ"] || 0;
+  const advPerc = percentages["ADV"] || 0;
+
+  // Generate specific insights based on percentages
+  if (nounPerc > 60 && verbPerc < 20) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm">
+          <strong>Noun-heavy vocabulary detected:</strong> {nounPerc}% nouns vs.
+          only {verbPerc}% verbs
+        </p>
+        <p className="text-sm text-muted-foreground">
+          While nouns are important, verbs are essential for making sentences
+          and expressing actions. Try adding more verb flashcards to balance
+          your vocabulary.
+        </p>
+        <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+          <strong>Tip:</strong> Add flashcards for common actions like "to
+          walk," "to eat," "to think"
+        </div>
+      </div>
+    );
+  }
+
+  if (adjPerc < 10 && advPerc < 5) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm">
+          <strong>More descriptive words needed:</strong> Only {adjPerc}%
+          adjectives and {advPerc}% adverbs
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Descriptive words add color and detail to your language. They help you
+          express nuance and make your speech more engaging.
+        </p>
+        <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+          <strong>Tip:</strong> Focus on adding adjectives like "beautiful,"
+          "difficult," "interesting"
+        </div>
+      </div>
+    );
+  }
+
+  if (nounPerc < 30 && verbPerc > 50) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm">
+          <strong>Verb-heavy vocabulary:</strong> {verbPerc}% verbs but only{" "}
+          {nounPerc}% nouns
+        </p>
+        <p className="text-sm text-muted-foreground">
+          You have many action words, but might need more nouns to talk about
+          people, places, and things.
+        </p>
+        <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+          <strong>Tip:</strong> Try adding more nouns related to your interests
+          and daily life
+        </div>
+      </div>
+    );
+  }
+
+  // Balanced vocabulary
+  return (
+    <div className="space-y-2">
+      <p className="text-sm">
+        <strong>Well-balanced vocabulary!</strong> Good distribution across
+        parts of speech
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Your vocabulary has a healthy mix of different word types, which helps
+        you construct varied sentences and express yourself more naturally.
+      </p>
+      <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+        <strong>Great job!</strong> Continue building your vocabulary across all
+        categories
+      </div>
+    </div>
+  );
 }
 
 export function StatsClient({ session }: { session: Session }) {
@@ -133,10 +214,11 @@ export function StatsClient({ session }: { session: Session }) {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid grid-cols-3 w-full sm:w-auto">
+          <TabsList className="grid grid-cols-4 w-full sm:w-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsTrigger value="vocabulary">Vocabulary</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab - Combined Stats */}
@@ -274,6 +356,8 @@ export function StatsClient({ session }: { session: Session }) {
                 </div>
               </div>
             </Card>
+
+            {/* Move the POS distribution card from Overview to a new Vocabulary tab section */}
           </TabsContent>
 
           {/* Quizzes Tab */}
@@ -282,7 +366,7 @@ export function StatsClient({ session }: { session: Session }) {
               <StatCard
                 title="Total Quizzes"
                 value={stats.total_quizzes}
-                icon={ListTodo}
+                icon={CheckSquare}
               />
               <StatCard
                 title="Words Answered"
@@ -422,6 +506,158 @@ export function StatsClient({ session }: { session: Session }) {
                   Longer intervals mean better long-term memory retention.
                   Regular reviews help move cards to longer intervals.
                 </p>
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Vocabulary Tab */}
+          <TabsContent value="vocabulary" className="space-y-6">
+            {/* Vocabulary Stats Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                title="Total Words"
+                value={
+                  stats.pos_distribution?.reduce(
+                    (sum, item) => sum + item.count,
+                    0
+                  ) || 0
+                }
+                icon={BookOpen}
+                description="Unique words learned"
+              />
+              <StatCard
+                title="Nouns"
+                value={
+                  stats.pos_distribution?.find((item) => item.pos === "NOUN")
+                    ?.count || 0
+                }
+                icon={Package}
+                description="People, places, things"
+              />
+              <StatCard
+                title="Verbs"
+                value={
+                  stats.pos_distribution?.find((item) => item.pos === "VERB")
+                    ?.count || 0
+                }
+                icon={Activity}
+                description="Action words"
+              />
+              <StatCard
+                title="Adjectives"
+                value={
+                  stats.pos_distribution?.find((item) => item.pos === "ADJ")
+                    ?.count || 0
+                }
+                icon={Paintbrush}
+                description="Descriptive words"
+              />
+            </div>
+
+            {/* POS Distribution Chart */}
+            <Card className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">
+                  Parts of Speech Distribution
+                </h2>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Left column: Distribution chart */}
+                <div>
+                  <h3 className="text-md font-medium mb-3">
+                    Distribution Breakdown
+                  </h3>
+                  <div className="space-y-3">
+                    {stats.pos_distribution?.map((item) => {
+                      // Calculate percentage for the progress bar
+                      const total = stats.pos_distribution.reduce(
+                        (sum, i) => sum + i.count,
+                        0
+                      );
+                      const percentage =
+                        total > 0 ? (item.count / total) * 100 : 0;
+
+                      return (
+                        <div key={item.pos} className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium">
+                              {formatPOS(item.pos)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {item.count} ({Math.round(percentage)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div
+                              className="bg-primary h-2 rounded-full"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Right column: Insights */}
+                <div className="bg-muted/20 rounded-lg p-4">
+                  <h3 className="text-md font-medium mb-2">
+                    Learning Insights
+                  </h3>
+                  {getPOSInsights(stats.pos_distribution || [])}
+                </div>
+              </div>
+            </Card>
+
+            {/* Vocabulary Balance Information */}
+            <Card className="p-6">
+              <h2 className="text-lg font-semibold mb-4">
+                Why Vocabulary Balance Matters
+              </h2>
+
+              <div className="space-y-4">
+                <p>
+                  Many language learners tend to focus heavily on nouns while
+                  neglecting other parts of speech. However, a balanced
+                  vocabulary across different grammatical categories is crucial
+                  for fluency.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="bg-muted/20 p-3 rounded-lg">
+                    <h3 className="font-medium mb-1">
+                      Balanced Learning Benefits
+                    </h3>
+                    <ul className="text-sm space-y-1 list-disc pl-4">
+                      <li>Better sentence construction ability</li>
+                      <li>More natural expression in conversations</li>
+                      <li>Improved comprehension of native speakers</li>
+                      <li>Faster progress to fluency</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-muted/20 p-3 rounded-lg">
+                    <h3 className="font-medium mb-1">
+                      Recommended Distribution
+                    </h3>
+                    <ul className="text-sm space-y-1 list-disc pl-4">
+                      <li>Nouns: 30-40% of vocabulary</li>
+                      <li>Verbs: 20-30% of vocabulary</li>
+                      <li>Adjectives: 15-20% of vocabulary</li>
+                      <li>Adverbs, prepositions, etc.: 20-25%</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="text-sm text-muted-foreground mt-2 pt-2 border-t">
+                  <p>
+                    Use these insights to guide your flashcard creation and
+                    ensure you're building a well-rounded vocabulary that helps
+                    you communicate effectively.
+                  </p>
+                </div>
               </div>
             </Card>
           </TabsContent>
