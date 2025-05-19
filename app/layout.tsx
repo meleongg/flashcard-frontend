@@ -29,14 +29,17 @@ export default async function RootLayout({
   const session = await getAuthSession();
   const isAuthenticated = !!session?.user;
 
+  // Check if user is in onboarding flow
+  const isInOnboarding = !!session?.isNewUser;
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          {isAuthenticated ? (
-            // Authenticated Layout with Sidebar and Header
+          {isAuthenticated && !isInOnboarding ? (
+            // Authenticated Layout with Sidebar and Header (except during onboarding)
             <div className="flex min-h-screen">
               <Sidebar />
               <div className="flex flex-col flex-1">
@@ -45,7 +48,7 @@ export default async function RootLayout({
               </div>
             </div>
           ) : (
-            // Unauthenticated Layout (just the content)
+            // Unauthenticated Layout or Onboarding (just the content)
             <div className="min-h-screen">{children}</div>
           )}
         </Providers>
