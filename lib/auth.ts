@@ -26,15 +26,8 @@ export const authOptions: NextAuthOptions = {
 
       // For new logins, set initial state
       if (account && account.providerAccountId) {
-        console.log("Setting initial isNewUser state:", isNewUser);
         token.isNewUser = isNewUser;
       }
-
-      // Debug the token state before DB check
-      console.log("Token before DB check:", {
-        id: token.id?.substring(0, 5) + "...", // Don't log full ID
-        isNewUser: token.isNewUser,
-      });
 
       // Important: Check database for onboarding status on EVERY token refresh
       // This ensures that after onboarding completes, the next page load will have updated status
@@ -47,30 +40,18 @@ export const authOptions: NextAuthOptions = {
             WHERE user_id = ${token.id}
           `;
 
-          // Debug the database result
-          console.log("DB query result:", result);
-
           // Now TypeScript knows result[0] structure
           if (
             result &&
             result.length > 0 &&
             result[0].onboarding_completed === true
           ) {
-            // Only log if we're changing the status
-            if (token.isNewUser) {
-              console.log("Setting isNewUser to false based on DB");
-            }
             token.isNewUser = false;
           }
         } catch (error) {
           console.error("Error checking onboarding status:", error);
         }
       }
-
-      // Debug the final token state
-      console.log("Final token state:", {
-        isNewUser: token.isNewUser,
-      });
 
       return token;
     },

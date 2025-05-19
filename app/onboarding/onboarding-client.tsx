@@ -99,8 +99,6 @@ export default function Onboarding({ session }: { session: Session }) {
         onboarding_completed: true, // Add this flag to mark onboarding as complete
       };
 
-      console.log("Sending settings data:", settingsData);
-
       // First, save user settings with the onboarding completed flag
       const res = await fetch(`${apiUrl}/settings`, {
         method: "PUT",
