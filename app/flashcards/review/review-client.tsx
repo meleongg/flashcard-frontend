@@ -33,7 +33,7 @@ import {
 import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export function FlashcardReviewClient({ session }: { session: Session }) {
@@ -312,6 +312,105 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
   const currentCard = cards[currentCardIndex];
   const progress = cards.length ? (currentCardIndex / cards.length) * 100 : 0;
 
+  // Add a useEffect for keyboard shortcuts
+
+  // Import useCallback if not already imported
+  // Add this keyboard handler using useCallback for better performance
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // Only handle keyboard shortcuts when in review mode
+      if (
+        reviewStatus !== ReviewStatus.IN_PROGRESS &&
+        reviewStatus !== ReviewStatus.FLIPPED
+      ) {
+        return;
+      }
+
+      // Prevent default for our shortcut keys to avoid scrolling, etc.
+      if (
+        [" ", "ArrowLeft", "ArrowRight", "1", "2", "3", "4", "5"].includes(
+          event.key
+        )
+      ) {
+        event.preventDefault();
+      }
+
+      // Handle different keys
+      switch (event.key) {
+        case " ": // Spacebar to flip card
+          if (!isFlipped) {
+            flipCard();
+          }
+          break;
+
+        case "ArrowLeft": // Previous card
+          if (currentCardIndex > 0 && !isSubmitting) {
+            setCurrentCardIndex((prev) => prev - 1);
+            setIsFlipped(false);
+          }
+          break;
+
+        case "ArrowRight": // Next card/Skip
+          if (
+            currentCardIndex < cards.length - 1 &&
+            isFlipped &&
+            !isSubmitting
+          ) {
+            setCurrentCardIndex((prev) => prev + 1);
+            setIsFlipped(false);
+          }
+          break;
+
+        // Rating keys - only active when card is flipped
+        case "1":
+          if (isFlipped && !isSubmitting) {
+            submitReview(ReviewRating.DIFFICULT);
+          }
+          break;
+        case "2":
+          if (isFlipped && !isSubmitting) {
+            submitReview(ReviewRating.GOOD);
+          }
+          break;
+        case "3":
+          if (isFlipped && !isSubmitting) {
+            submitReview(ReviewRating.EASY);
+          }
+          break;
+        case "4":
+          if (isFlipped && !isSubmitting) {
+            submitReview(ReviewRating.PERFECT);
+          }
+          break;
+        case "r": // Reset card
+          if (isFlipped && !isSubmitting) {
+            resetCard();
+          }
+          break;
+      }
+    },
+    [
+      reviewStatus,
+      isFlipped,
+      currentCardIndex,
+      cards.length,
+      isSubmitting,
+      flipCard,
+      submitReview,
+      resetCard,
+    ]
+  );
+
+  // Add and remove the keyboard event listener
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Clean up
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handleKeyDown]);
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6">
       {/* Header with session status indicator */}
@@ -542,7 +641,7 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
                   <ThumbsDown className="h-5 w-5 text-destructive mb-1" />
                   <span className="text-xs font-medium">Again</span>
                   <span className="text-[10px] text-muted-foreground">
-                    Soon
+                    Soon <kbd className="px-1 bg-muted rounded">1</kbd>
                   </span>
                 </Button>
                 <Button
@@ -554,7 +653,7 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
                   <ThumbsDown className="h-5 w-5 text-amber-500 mb-1" />
                   <span className="text-xs font-medium">Hard</span>
                   <span className="text-[10px] text-muted-foreground">
-                    Later Today
+                    Later Today <kbd className="px-1 bg-muted rounded">2</kbd>
                   </span>
                 </Button>
                 <Button
@@ -566,7 +665,7 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
                   <ThumbsUp className="h-5 w-5 text-lime-600 mb-1" />
                   <span className="text-xs font-medium">Good</span>
                   <span className="text-[10px] text-muted-foreground">
-                    Tomorrow
+                    Tomorrow <kbd className="px-1 bg-muted rounded">3</kbd>
                   </span>
                 </Button>
                 <Button
@@ -578,7 +677,7 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
                   <ThumbsUp className="h-5 w-5 text-primary mb-1" />
                   <span className="text-xs font-medium">Easy</span>
                   <span className="text-[10px] text-muted-foreground">
-                    3+ Days
+                    3+ Days <kbd className="px-1 bg-muted rounded">4</kbd>
                   </span>
                 </Button>
               </div>
@@ -746,6 +845,39 @@ export function FlashcardReviewClient({ session }: { session: Session }) {
               <Link href="/flashcards">View All Flashcards</Link>
             </Button>
           </CardFooter>
+        </Card>
+      )}
+
+      {/* Keyboard Shortcuts Help - Shown on READY screen */}
+      {reviewStatus === ReviewStatus.READY && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Keyboard Shortcuts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 text-sm gap-y-1">
+              <div className="flex items-center">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded mr-2">Space</kbd>
+                <span className="text-muted-foreground">Flip card</span>
+              </div>
+              <div className="flex items-center">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded mr-2">1-4</kbd>
+                <span className="text-muted-foreground">Rate card</span>
+              </div>
+              <div className="flex items-center">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded mr-2">←</kbd>
+                <span className="text-muted-foreground">Previous card</span>
+              </div>
+              <div className="flex items-center">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded mr-2">→</kbd>
+                <span className="text-muted-foreground">Next card</span>
+              </div>
+              <div className="flex items-center">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded mr-2">r</kbd>
+                <span className="text-muted-foreground">Reset card</span>
+              </div>
+            </div>
+          </CardContent>
         </Card>
       )}
     </div>
