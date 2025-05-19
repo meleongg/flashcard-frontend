@@ -27,4 +27,5 @@ export interface StatsData {
     pos: string;
     count: number;
   }[];
+  total_cards: number;
 }

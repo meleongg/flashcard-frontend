@@ -38,11 +38,15 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 
-// Helper function to get insights from POS distribution
-function getPOSInsights(posDistribution: { pos: string; count: number }[]) {
-  const total = posDistribution.reduce((sum, item) => sum + item.count, 0);
-
-  if (total === 0) {
+// Replace the insights rendering in the vocabulary tab with this component
+function POSInsightDisplay({
+  insight,
+  status,
+}: {
+  insight: string | null;
+  status: string;
+}) {
+  if (!insight) {
     return (
       <p className="text-sm text-muted-foreground">
         No data available yet. Add flashcards to see insights.
@@ -50,98 +54,84 @@ function getPOSInsights(posDistribution: { pos: string; count: number }[]) {
     );
   }
 
-  // Get percentages by POS
-  const percentages: Record<string, number> = {};
-  posDistribution.forEach((item) => {
-    percentages[item.pos] = Math.round((item.count / total) * 100);
-  });
+  // Map status to appropriate UI treatment
+  const getStatusUI = () => {
+    switch (status) {
+      case "noun_heavy":
+        return (
+          <div className="space-y-2">
+            <p className="text-sm">
+              <strong>Noun-heavy vocabulary detected</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">{insight}</p>
+            <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+              <strong>Tip:</strong> Add flashcards for common actions like "to
+              walk," "to eat," "to think"
+            </div>
+          </div>
+        );
 
-  // Check for imbalances
-  const nounPerc = percentages["NOUN"] || 0;
-  const verbPerc = percentages["VERB"] || 0;
-  const adjPerc = percentages["ADJ"] || 0;
-  const advPerc = percentages["ADV"] || 0;
+      case "needs_descriptive":
+        return (
+          <div className="space-y-2">
+            <p className="text-sm">
+              <strong>More descriptive words needed</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">{insight}</p>
+            <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+              <strong>Tip:</strong> Focus on adding adjectives like "beautiful,"
+              "difficult," "interesting"
+            </div>
+          </div>
+        );
 
-  // Generate specific insights based on percentages
-  if (nounPerc > 60 && verbPerc < 20) {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm">
-          <strong>Noun-heavy vocabulary detected:</strong> {nounPerc}% nouns vs.
-          only {verbPerc}% verbs
-        </p>
-        <p className="text-sm text-muted-foreground">
-          While nouns are important, verbs are essential for making sentences
-          and expressing actions. Try adding more verb flashcards to balance
-          your vocabulary.
-        </p>
-        <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
-          <strong>Tip:</strong> Add flashcards for common actions like "to
-          walk," "to eat," "to think"
-        </div>
-      </div>
-    );
-  }
+      case "verb_heavy":
+        return (
+          <div className="space-y-2">
+            <p className="text-sm">
+              <strong>Verb-heavy vocabulary</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">{insight}</p>
+            <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+              <strong>Tip:</strong> Try adding more nouns related to your
+              interests and daily life
+            </div>
+          </div>
+        );
 
-  if (adjPerc < 10 && advPerc < 5) {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm">
-          <strong>More descriptive words needed:</strong> Only {adjPerc}%
-          adjectives and {advPerc}% adverbs
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Descriptive words add color and detail to your language. They help you
-          express nuance and make your speech more engaging.
-        </p>
-        <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
-          <strong>Tip:</strong> Focus on adding adjectives like "beautiful,"
-          "difficult," "interesting"
-        </div>
-      </div>
-    );
-  }
+      case "balanced":
+        return (
+          <div className="space-y-2">
+            <p className="text-sm">
+              <strong>Well-balanced vocabulary!</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">{insight}</p>
+            <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
+              <strong>Great job!</strong> Continue building your vocabulary
+              across all categories
+            </div>
+          </div>
+        );
 
-  if (nounPerc < 30 && verbPerc > 50) {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm">
-          <strong>Verb-heavy vocabulary:</strong> {verbPerc}% verbs but only{" "}
-          {nounPerc}% nouns
-        </p>
-        <p className="text-sm text-muted-foreground">
-          You have many action words, but might need more nouns to talk about
-          people, places, and things.
-        </p>
-        <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
-          <strong>Tip:</strong> Try adding more nouns related to your interests
-          and daily life
-        </div>
-      </div>
-    );
-  }
+      default:
+        return (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">{insight}</p>
+          </div>
+        );
+    }
+  };
 
-  // Balanced vocabulary
-  return (
-    <div className="space-y-2">
-      <p className="text-sm">
-        <strong>Well-balanced vocabulary!</strong> Good distribution across
-        parts of speech
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Your vocabulary has a healthy mix of different word types, which helps
-        you construct varied sentences and express yourself more naturally.
-      </p>
-      <div className="bg-primary/10 p-2 rounded text-xs border-l-2 border-primary mt-2">
-        <strong>Great job!</strong> Continue building your vocabulary across all
-        categories
-      </div>
-    </div>
-  );
+  return getStatusUI();
 }
 
 export function StatsClient({ session }: { session: Session }) {
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [posInsights, setPosInsights] = useState<{
+    insight: string | null;
+    tags: Record<string, number>;
+    status: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -155,18 +145,31 @@ export function StatsClient({ session }: { session: Session }) {
       const sessionObj = await getSession();
       const token = sessionObj?.accessToken;
 
-      const res = await fetch(`${apiUrl}/stats`, {
+      // Fetch regular stats
+      const statsRes = await fetch(`${apiUrl}/stats`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      if (!res.ok) {
-        throw new Error(`Failed to fetch stats: ${res.status}`);
+      if (!statsRes.ok) {
+        throw new Error(`Failed to fetch stats: ${statsRes.status}`);
       }
 
-      const data = await res.json();
-      setStats(data);
+      const statsData = await statsRes.json();
+      setStats(statsData);
+
+      // Fetch POS insights
+      const insightsRes = await fetch(`${apiUrl}/stats/pos-insights`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (insightsRes.ok) {
+        const insightsData = await insightsRes.json();
+        setPosInsights(insightsData);
+      }
     } catch (error) {
       console.error("Error fetching stats:", error);
       toast.error("Failed to load statistics");
@@ -203,6 +206,9 @@ export function StatsClient({ session }: { session: Session }) {
       </div>
     );
   }
+
+  // Replace the existing totalCards calculation with this direct reference
+  const totalCards = stats?.total_cards || 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-4">
@@ -516,20 +522,16 @@ export function StatsClient({ session }: { session: Session }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
                 title="Total Words"
-                value={
-                  stats.pos_distribution?.reduce(
-                    (sum, item) => sum + item.count,
-                    0
-                  ) || 0
-                }
+                value={totalCards}
                 icon={BookOpen}
                 description="Unique words learned"
               />
               <StatCard
                 title="Nouns"
                 value={
-                  stats.pos_distribution?.find((item) => item.pos === "NOUN")
-                    ?.count || 0
+                  posInsights?.tags?.["NOUN"]
+                    ? Math.round((posInsights.tags["NOUN"] / 100) * totalCards)
+                    : 0
                 }
                 icon={Package}
                 description="People, places, things"
@@ -537,8 +539,9 @@ export function StatsClient({ session }: { session: Session }) {
               <StatCard
                 title="Verbs"
                 value={
-                  stats.pos_distribution?.find((item) => item.pos === "VERB")
-                    ?.count || 0
+                  posInsights?.tags?.["VERB"]
+                    ? Math.round((posInsights.tags["VERB"] / 100) * totalCards)
+                    : 0
                 }
                 icon={Activity}
                 description="Action words"
@@ -546,8 +549,9 @@ export function StatsClient({ session }: { session: Session }) {
               <StatCard
                 title="Adjectives"
                 value={
-                  stats.pos_distribution?.find((item) => item.pos === "ADJ")
-                    ?.count || 0
+                  posInsights?.tags?.["ADJ"]
+                    ? Math.round((posInsights.tags["ADJ"] / 100) * totalCards)
+                    : 0
                 }
                 icon={Paintbrush}
                 description="Descriptive words"
@@ -561,6 +565,27 @@ export function StatsClient({ session }: { session: Session }) {
                 <h2 className="text-lg font-semibold">
                   Parts of Speech Distribution
                 </h2>
+                {posInsights?.status && (
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full ${
+                      posInsights.status === "balanced"
+                        ? "bg-green-100 text-green-800"
+                        : posInsights.status === "no_data"
+                        ? "bg-gray-100 text-gray-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {posInsights.status === "balanced"
+                      ? "Balanced"
+                      : posInsights.status === "noun_heavy"
+                      ? "Noun Heavy"
+                      : posInsights.status === "verb_heavy"
+                      ? "Verb Heavy"
+                      : posInsights.status === "needs_descriptive"
+                      ? "Need Descriptives"
+                      : "No Data"}
+                  </span>
+                )}
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
@@ -570,34 +595,42 @@ export function StatsClient({ session }: { session: Session }) {
                     Distribution Breakdown
                   </h3>
                   <div className="space-y-3">
-                    {stats.pos_distribution?.map((item) => {
-                      // Calculate percentage for the progress bar
-                      const total = stats.pos_distribution.reduce(
-                        (sum, i) => sum + i.count,
-                        0
-                      );
-                      const percentage =
-                        total > 0 ? (item.count / total) * 100 : 0;
+                    {posInsights?.tags &&
+                      Object.entries(posInsights.tags).map(
+                        ([pos, percentage]) => {
+                          // Calculate count based on percentage and totalCards
+                          const count = Math.round(
+                            (percentage / 100) * totalCards
+                          );
 
-                      return (
-                        <div key={item.pos} className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="font-medium">
-                              {formatPOS(item.pos)}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {item.count} ({Math.round(percentage)}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-2">
-                            <div
-                              className="bg-primary h-2 rounded-full"
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                          return (
+                            <div key={pos} className="space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span className="font-medium">
+                                  {formatPOS(pos)}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {count} ({percentage}%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                  className="bg-primary h-2 rounded-full"
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
+                      )}
+
+                    {/* Show message if no data */}
+                    {(!posInsights?.tags ||
+                      Object.keys(posInsights.tags).length === 0) && (
+                      <p className="text-sm text-muted-foreground">
+                        No distribution data available
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -606,7 +639,16 @@ export function StatsClient({ session }: { session: Session }) {
                   <h3 className="text-md font-medium mb-2">
                     Learning Insights
                   </h3>
-                  {getPOSInsights(stats.pos_distribution || [])}
+                  {posInsights ? (
+                    <POSInsightDisplay
+                      insight={posInsights.insight}
+                      status={posInsights.status}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Loading insights...
+                    </p>
+                  )}
                 </div>
               </div>
             </Card>
