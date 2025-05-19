@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -31,7 +42,8 @@ import { apiUrl } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Save } from "lucide-react";
 import { Session } from "next-auth";
-import { getSession } from "next-auth/react";
+import { getSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -68,6 +80,8 @@ const languages = [
 export function AccountClient({ session }: { session: Session }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
 
   // Initialize form
   const form = useForm<UserSettings>({
@@ -150,6 +164,46 @@ export function AccountClient({ session }: { session: Session }) {
       toast.error("Failed to update settings");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Handle account deletion
+  const handleDeleteAccount = async () => {
+    try {
+      setIsDeleting(true);
+      const sessionObj = await getSession();
+      const token = sessionObj?.accessToken;
+
+      const response = await fetch(`${apiUrl}/account`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        // Handle different error responses if needed
+        if (response.status === 401) {
+          throw new Error("Unauthorized. Please log in again.");
+        } else {
+          throw new Error(`Failed to delete account: ${response.status}`);
+        }
+      }
+
+      toast.success("Your account has been deleted successfully");
+
+      // Sign out and force a full page reload to clear all state
+      await signOut({
+        redirect: true,
+        callbackUrl: "/",
+      });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete account"
+      );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -408,12 +462,42 @@ export function AccountClient({ session }: { session: Session }) {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button
-            variant="destructive"
-            onClick={() => toast.error("This feature is not implemented yet")}
-          >
-            Delete Account
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">Delete Account</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete
+                  your account and remove all your data from our servers,
+                  including all flashcards, review history, and quiz results.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    // Prevent the dialog from closing automatically
+                    e.preventDefault();
+                    handleDeleteAccount();
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Account"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardFooter>
       </Card>
     </div>
