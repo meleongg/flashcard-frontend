@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { Session } from "next-auth";
 import { getSession } from "next-auth/react";
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface FlashcardCreatorProps {
@@ -145,17 +145,17 @@ export function FlashcardCreator({
       const sessionObj = await getSession();
       const token = sessionObj?.accessToken;
 
-      // Build the request
+      // Build the request with the correct field name (word instead of text)
       const payload = {
-        text,
+        word: text,
         source_lang:
           languageDirection.split("-")[0] === "auto"
-            ? null
+            ? "auto" // Send "auto" explicitly rather than null
             : languageDirection.split("-")[0],
         target_lang: languageDirection.split("-")[1],
       };
 
-      const res = await fetch(`${apiUrl}/generate`, {
+      const res = await fetch(`${apiUrl}/flashcard-preview`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -206,12 +206,24 @@ export function FlashcardCreator({
 
       // Prepare flashcard data with folder
       const flashcardToSave = {
-        ...previewFlashcard,
+        word: previewFlashcard.word.trim(),
+        translation: previewFlashcard.translation || "",
+        phonetic: previewFlashcard.phonetic || "",
+        pos: previewFlashcard.pos || "NOUN", // Default to NOUN if not specified
+        example: previewFlashcard.example || "",
+        notes: previewFlashcard.notes || "",
+        source_lang:
+          previewFlashcard.source_lang ||
+          (languageDirection.split("-")[0] === "auto"
+            ? "en"
+            : languageDirection.split("-")[0]),
+        target_lang:
+          previewFlashcard.target_lang || languageDirection.split("-")[1],
         folder_id: selectedFolderId === "none" ? null : selectedFolderId,
       };
 
       // Send to backend
-      const res = await fetch(`${apiUrl}/flashcards`, {
+      const res = await fetch(`${apiUrl}/flashcard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -331,9 +343,9 @@ export function FlashcardCreator({
                         <SelectValue placeholder="Translate" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="auto-zh">Auto → Mandarin</SelectItem>
+                        {/* <SelectItem value="auto-zh">Auto → Mandarin</SelectItem>
                         <SelectItem value="auto-fr">Auto → French</SelectItem>
-                        <SelectItem value="auto-en">Auto → English</SelectItem>
+                        <SelectItem value="auto-en">Auto → English</SelectItem> */}
                         <SelectItem value="en-zh">
                           English → Mandarin
                         </SelectItem>
