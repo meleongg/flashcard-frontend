@@ -38,12 +38,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/lib/constants";
+import { apiUrl, languages } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Save } from "lucide-react";
 import { Session } from "next-auth";
 import { getSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -65,23 +64,10 @@ const settingsFormSchema = z.object({
 
 type UserSettings = z.infer<typeof settingsFormSchema>;
 
-// Language options
-const languages = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "zh", label: "Chinese" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "ru", label: "Russian" },
-];
-
 export function AccountClient({ session }: { session: Session }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const router = useRouter();
 
   // Initialize form
   const form = useForm<UserSettings>({
@@ -355,7 +341,6 @@ export function AccountClient({ session }: { session: Session }) {
                 )}
               />
 
-              {/* Source Language (previously "Native Language") */}
               <FormField
                 control={form.control}
                 name="default_source_lang"
@@ -385,7 +370,6 @@ export function AccountClient({ session }: { session: Session }) {
                 )}
               />
 
-              {/* Target Language (previously "Learning Language") */}
               <FormField
                 control={form.control}
                 name="default_target_lang"

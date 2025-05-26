@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiUrl } from "@/lib/constants";
+import { apiUrl, languages } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { Session } from "next-auth";
@@ -47,18 +47,6 @@ const onboardingSchema = z.object({
   reverse_quiz_default: z.boolean().default(false),
   dark_mode: z.boolean().default(false),
 });
-
-// Language options (same as used in account-client.tsx)
-const languages = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "zh", label: "Chinese" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "ru", label: "Russian" },
-];
 
 export default function Onboarding({ session }: { session: Session }) {
   const [step, setStep] = useState(1);
