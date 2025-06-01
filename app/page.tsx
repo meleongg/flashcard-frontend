@@ -16,7 +16,6 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="border-b bg-background z-10">
         <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 lg:px-8 justify-between">
           <div className="flex items-center gap-2">
@@ -29,10 +28,8 @@ export default async function LandingPage() {
         </div>
       </header>
 
-      {/* Hero Section */}
       <section className="py-16 md:py-24 px-4">
         <div className="container mx-auto max-w-6xl">
-          {/* Change to grid for better control */}
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6 order-2 lg:order-1">
               <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
@@ -57,7 +54,6 @@ export default async function LandingPage() {
               </div>
             </div>
 
-            {/* Image container with explicit z-index */}
             <div className="relative order-1 lg:order-2 z-10 lg:z-0">
               <div className="bg-muted rounded-xl overflow-hidden shadow-xl">
                 <div className="aspect-video min-h-[250px] md:min-h-[300px] flex items-center justify-center">
@@ -71,7 +67,6 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
       <section id="features" className="py-16 bg-muted/30">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="text-center mb-12">
@@ -104,7 +99,6 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works Section */}
       <section className="py-16">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="text-center mb-12">
@@ -134,7 +128,6 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-16 bg-primary/5">
         <div className="container mx-auto max-w-3xl px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">
@@ -148,7 +141,6 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="py-8 border-t mt-auto">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
