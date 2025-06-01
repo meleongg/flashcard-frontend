@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme } from "@/components/theme-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +69,7 @@ export function AccountClient({ session }: { session: Session }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { setTheme } = useTheme();
 
   // Initialize form
   const form = useForm<UserSettings>({
@@ -286,7 +288,12 @@ export function AccountClient({ session }: { session: Session }) {
                     <FormControl>
                       <Switch
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(checked) => {
+                          // Update the form field
+                          field.onChange(checked);
+                          // Immediately apply the theme change
+                          setTheme(checked ? "dark" : "light");
+                        }}
                       />
                     </FormControl>
                   </FormItem>

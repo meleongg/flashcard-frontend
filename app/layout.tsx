@@ -18,6 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://flashcard-frontend-one.vercel.app/"),
   title: {
     default: "FlashLearn - Smart Language Learning with AI-Powered Flashcards",
     template: "%s | FlashLearn",
