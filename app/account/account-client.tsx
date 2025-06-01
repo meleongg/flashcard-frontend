@@ -44,6 +44,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Save } from "lucide-react";
 import { Session } from "next-auth";
 import { getSession, signOut } from "next-auth/react";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -69,7 +70,11 @@ export function AccountClient({ session }: { session: Session }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savedDarkMode, setSavedDarkMode] = useState(false); // Track the saved state
   const { setTheme } = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Initialize form
   const form = useForm<UserSettings>({
@@ -84,6 +89,8 @@ export function AccountClient({ session }: { session: Session }) {
       daily_learning_goal: 10,
     },
   });
+
+  const formValues = form.watch();
 
   // Fetch current settings
   useEffect(() => {
@@ -104,6 +111,11 @@ export function AccountClient({ session }: { session: Session }) {
         }
 
         const data = await res.json();
+        const darkModeValue = !!data.dark_mode;
+
+        // Set the saved dark mode state and apply theme
+        setSavedDarkMode(darkModeValue);
+        setTheme(darkModeValue ? "dark" : "light");
 
         // Update form with fetched data
         form.reset({
@@ -112,7 +124,7 @@ export function AccountClient({ session }: { session: Session }) {
           default_quiz_length: data.default_quiz_length || 10,
           auto_tts: !!data.auto_tts,
           reverse_quiz_default: !!data.reverse_quiz_default,
-          dark_mode: !!data.dark_mode,
+          dark_mode: darkModeValue,
           daily_learning_goal: data.daily_learning_goal || 10,
         });
       } catch (error) {
@@ -124,7 +136,67 @@ export function AccountClient({ session }: { session: Session }) {
     };
 
     fetchSettings();
-  }, [form]);
+  }, [form, setTheme]);
+
+  // Detect route changes and revert theme if there are unsaved changes
+  useEffect(() => {
+    const handleRouteChange = () => {
+      if (hasUnsavedChanges && formValues.dark_mode !== savedDarkMode) {
+        // Revert to saved theme state
+        setTheme(savedDarkMode ? "dark" : "light");
+      }
+    };
+
+    // This will run when the component unmounts (route change)
+    return () => {
+      handleRouteChange();
+    };
+  }, [hasUnsavedChanges, formValues.dark_mode, savedDarkMode, setTheme]);
+
+  // Check for unsaved changes
+  useEffect(() => {
+    // Check if current form values differ from the initially loaded values
+    if (!isLoading) {
+      const initialValues = {
+        default_source_lang: form.formState.defaultValues?.default_source_lang,
+        default_target_lang: form.formState.defaultValues?.default_target_lang,
+        default_quiz_length: form.formState.defaultValues?.default_quiz_length,
+        auto_tts: form.formState.defaultValues?.auto_tts,
+        reverse_quiz_default:
+          form.formState.defaultValues?.reverse_quiz_default,
+        dark_mode: form.formState.defaultValues?.dark_mode,
+        daily_learning_goal: form.formState.defaultValues?.daily_learning_goal,
+      };
+
+      const hasChanges = Object.keys(initialValues).some(
+        (key) =>
+          formValues[key as keyof typeof formValues] !==
+          initialValues[key as keyof typeof initialValues]
+      );
+
+      setHasUnsavedChanges(hasChanges);
+    }
+  }, [formValues, isLoading, form.formState.defaultValues]);
+
+  // Warn users when they try to leave the page with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        // Modern approach - just prevent default
+        e.preventDefault();
+
+        // For older browsers compatibility, you can still set returnValue
+        // but this suppresses the TypeScript warning
+        (e as any).returnValue = "";
+
+        // The browser will show its own generic message
+        return "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Save settings
   const onSubmit = async (data: UserSettings) => {
@@ -145,6 +217,13 @@ export function AccountClient({ session }: { session: Session }) {
       if (!res.ok) {
         throw new Error(`Failed to update settings: ${res.status}`);
       }
+
+      // Update saved dark mode state
+      setSavedDarkMode(data.dark_mode);
+
+      // Reset the form with new values to clear the "unsaved changes" state
+      form.reset(data);
+      setHasUnsavedChanges(false);
 
       toast.success("Settings updated successfully");
     } catch (error) {
@@ -217,6 +296,32 @@ export function AccountClient({ session }: { session: Session }) {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Sticky Save Button */}
+              {hasUnsavedChanges && (
+                <div className="sticky top-4 z-10 bg-background/80 backdrop-blur-sm border rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                      <span className="text-sm font-medium">
+                        You have unsaved changes
+                      </span>
+                    </div>
+                    <Button type="submit" disabled={isSaving} size="sm">
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                          Saving
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" /> Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Daily Learning Goal */}
               <FormField
                 control={form.control}
@@ -280,7 +385,14 @@ export function AccountClient({ session }: { session: Session }) {
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Dark Mode</FormLabel>
+                      <FormLabel className="text-base">
+                        Dark Mode
+                        {field.value !== savedDarkMode && (
+                          <span className="ml-2 text-xs text-orange-500 font-normal">
+                            (unsaved)
+                          </span>
+                        )}
+                      </FormLabel>
                       <FormDescription>
                         Use dark theme for the application
                       </FormDescription>
@@ -289,9 +401,9 @@ export function AccountClient({ session }: { session: Session }) {
                       <Switch
                         checked={field.value}
                         onCheckedChange={(checked) => {
-                          // Update the form field
+                          // Update the form field (this will trigger the unsaved changes detection)
                           field.onChange(checked);
-                          // Immediately apply the theme change
+                          // Immediately apply the theme change for visual feedback
                           setTheme(checked ? "dark" : "light");
                         }}
                       />
@@ -406,14 +518,24 @@ export function AccountClient({ session }: { session: Session }) {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={isSaving}>
+              {/* Keep the original save button at the bottom too, but show different state */}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isSaving}
+                variant={hasUnsavedChanges ? "default" : "secondary"}
+              >
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving
                   </>
+                ) : hasUnsavedChanges ? (
+                  <>
+                    <Save className="mr-2 h-4 w-4" /> Save Changes
+                  </>
                 ) : (
                   <>
-                    <Save className="mr-2 h-4 w-4" /> Save Settings
+                    <Save className="mr-2 h-4 w-4" /> Settings Saved
                   </>
                 )}
               </Button>
